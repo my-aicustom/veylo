@@ -93,35 +93,36 @@ export default function SimulationPage() {
     });
     if (!alive.current) return;
 
-    let translation: string | undefined;
-    if (language.toLowerCase() !== profile.preferredLanguage.toLowerCase()) {
-      try {
-        const translated = await translate(result.reply, {
-          sourceLanguage: language,
-          targetLanguage: profile.preferredLanguage,
-          sourceCountry: countryName(country),
-          targetCountry: profile.countryName,
-        });
-        translation = translated.text;
-      } catch (error) {
-        console.warn('[simulation] subtitle translation failed', error);
-      }
-    }
-
-    if (!alive.current) return;
-
     const aiTurn: SimTurn = {
       id: crypto.randomUUID(),
       speaker: 'ai',
       text: result.reply,
-      translation,
       at: new Date().toISOString(),
     };
     const next = [...turnsRef.current, aiTurn];
     turnsRef.current = next;
     setTurns(next);
     setStatus('Speaking…');
-    await play(result.reply);
+
+    const subtitlePromise = language.toLowerCase() !== profile.preferredLanguage.toLowerCase()
+      ? translate(result.reply, {
+          sourceLanguage: language,
+          targetLanguage: profile.preferredLanguage,
+          sourceCountry: countryName(country),
+          targetCountry: profile.countryName,
+        }).then((translated) => {
+          if (!alive.current) return;
+          const updated = turnsRef.current.map((turn) =>
+            turn.id === aiTurn.id ? { ...turn, translation: translated.text } : turn,
+          );
+          turnsRef.current = updated;
+          setTurns(updated);
+        }).catch((error) => {
+          console.warn('[simulation] subtitle translation failed', error);
+        })
+      : Promise.resolve();
+
+    await Promise.all([play(result.reply), subtitlePromise]);
     if (alive.current) setStatus('Listening');
   }
 
