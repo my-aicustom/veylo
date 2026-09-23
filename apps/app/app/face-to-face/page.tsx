@@ -7,8 +7,11 @@ import { countryName, defaultLanguage, loadProfile } from '@/lib/profile';
 import { PhraseRecorder } from '@/lib/wav-recorder';
 import { speak, transcribe, translate } from '@/lib/client-ai';
 import { downloadTranscript } from '@/lib/transcript-export';
+import { clearTranscript, loadTranscript, saveTranscript } from '@/lib/transcript-persistence';
 import type { Profile, TranscriptTurn } from '@/lib/types';
 import { ProfileForm } from '@/components/ProfileForm';
+
+const SESSION_ID = 'face-to-face:active';
 
 export default function FaceToFacePage() {
   const router = useRouter();
@@ -25,7 +28,11 @@ export default function FaceToFacePage() {
   const lastSide = React.useRef<'you' | 'other'>('other');
   const alive = React.useRef(false);
 
-  React.useEffect(() => { setProfile(loadProfile()); setReady(true); }, []);
+  React.useEffect(() => {
+    setProfile(loadProfile());
+    setTurns(loadTranscript(SESSION_ID));
+    setReady(true);
+  }, []);
   React.useEffect(() => setOtherLanguage(defaultLanguage(otherCountry)), [otherCountry]);
   React.useEffect(() => () => recorderRef.current?.stop(), []);
 
@@ -39,6 +46,19 @@ export default function FaceToFacePage() {
     if (mine && !theirs) return 'you' as const;
     if (theirs && !mine) return 'other' as const;
     return lastSide.current === 'you' ? 'other' : 'you';
+  }
+
+  function commitTurns(update: (current: TranscriptTurn[]) => TranscriptTurn[]) {
+    setTurns((current) => {
+      const next = update(current).slice(-80);
+      saveTranscript(SESSION_ID, next);
+      return next;
+    });
+  }
+
+  function resetTranscript() {
+    setTurns([]);
+    clearTranscript(SESSION_ID);
   }
 
   async function play(text: string) {
@@ -86,7 +106,7 @@ export default function FaceToFacePage() {
       sourceLanguage: detected,
       targetLanguage,
     };
-    setTurns((current) => [...current.slice(-49), turn]);
+    commitTurns((current) => [...current, turn]);
     setStatus('Speaking translation…');
     await play(result.text);
     if (alive.current) setStatus('Listening');
@@ -161,9 +181,10 @@ export default function FaceToFacePage() {
           <div className="transcript-card-head">
             <div className="eyebrow">LIVE TRANSCRIPT</div>
             {turns.length > 0 && (
-              <button className="ghost small" onClick={() => downloadTranscript(turns, 'face-to-face')}>
-                Download
-              </button>
+              <div className="transcript-card-actions">
+                <button className="ghost small" onClick={() => downloadTranscript(turns, 'face-to-face')}>Download</button>
+                <button className="ghost small" onClick={resetTranscript}>Clear</button>
+              </div>
             )}
           </div>
           {turns.length === 0 ? <p className="empty-caption">Conversation will appear here.</p> : turns.map((turn) => (
