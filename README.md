@@ -1,4 +1,4 @@
-# VEYLO — v0.4.0
+# VEYLO — v0.4.1
 
 > Working codename. Internal multilingual communication product by MY-AI.
 
@@ -13,7 +13,7 @@ veylo/
 │   └── app/         # Next.js + LiveKit + OpenRouter application
 ├── infra/           # self-hosted LiveKit config
 ├── deploy/          # reverse proxy example
-├── docs/            # architecture, copy, design and cycle notes
+├── docs/            # architecture, deployment, copy, design and cycle notes
 └── docker-compose.yml
 ```
 
@@ -57,9 +57,22 @@ docker compose up --build
 
 Then open http://localhost:8080.
 
+The root Docker Compose file is for local/internal development. **Do not publish it unchanged to the internet.** Read `docs/DEPLOYMENT.md` before VPS deployment; production LiveKit needs a public `wss://` endpoint, trusted TLS, public-IP advertisement and TURN coverage for restrictive networks.
+
+## v0.4.1 hardening
+
+- CI now installs with the frozen lockfile, runs static audit, TypeScript checks, and builds both applications.
+- AI routes have same-origin checks, input limits and lightweight per-IP rate limits without adding a login screen.
+- STT defaults to `openai/whisper-large-v3-turbo`.
+- Translation can prioritize low-latency OpenRouter providers with `OPENROUTER_PROVIDER_SORT=latency`.
+- OpenRouter retries are limited to network errors, 429s and 5xx responses; request errors are no longer retried blindly.
+- TTS validates that the provider actually returned audio before playback.
+
 ## Non-negotiable security boundary
 
 `OPENROUTER_API_KEY`, `LIVEKIT_API_SECRET`, and any future server credential must never be shipped into browser code. OpenRouter calls live only in Next.js server routes.
+
+Veylo intentionally has no user login. Current API guards are suitable for a single-instance internal deployment; if it becomes broadly public or horizontally scaled, move rate limiting to shared state and add an outer access/session layer.
 
 ## Foundation
 
