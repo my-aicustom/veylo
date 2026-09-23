@@ -12,6 +12,7 @@ import {
 import { PhraseRecorder } from './wav-recorder';
 import { parseParticipantMetadata } from './participant-context';
 import { mediate, speak, transcribe, translate } from './client-ai';
+import { clearTranscript, loadTranscript, saveTranscript } from './transcript-persistence';
 import type { Profile, TranscriptTurn } from './types';
 
 type Lane = {
@@ -20,7 +21,12 @@ type Lane = {
   track: RemoteAudioTrack;
 };
 
-export function useRemoteInterpreter(room: Room, profile: Profile | null, enabled: boolean) {
+export function useRemoteInterpreter(
+  room: Room,
+  profile: Profile | null,
+  enabled: boolean,
+  options?: { targetLanguage?: string; sessionId?: string },
+) {
   const [turns, setTurns] = React.useState<TranscriptTurn[]>([]);
   const [status, setStatus] = React.useState('Interpreter off');
   const [mediatorNote, setMediatorNote] = React.useState<string | null>(null);
@@ -28,6 +34,22 @@ export function useRemoteInterpreter(room: Room, profile: Profile | null, enable
   const lanes = React.useRef(new Map<string, Lane>());
   const speechQueue = React.useRef<Promise<void>>(Promise.resolve());
   const stopped = React.useRef(false);
+
+  const targetLanguage = options?.targetLanguage || profile?.preferredLanguage || 'en';
+  const sessionId = options?.sessionId;
+
+  React.useEffect(() => {
+    if (!sessionId) return;
+    const restored = loadTranscript(sessionId);
+    turnsRef.current = restored;
+    setTurns(restored);
+  }, [sessionId]);
+
+  const commitTurns = React.useCallback((nextTurns: TranscriptTurn[]) => {
+    turnsRef.current = nextTurns;
+    setTurns(nextTurns);
+    if (sessionId) saveTranscript(sessionId, nextTurns);
+  }, [sessionId]);
 
   const play = React.useCallback(async (text: string) => {
     const blob = await speak(text);
@@ -60,14 +82,14 @@ export function useRemoteInterpreter(room: Room, profile: Profile | null, enable
     const sourceLanguage = (stt.language || '').split('-')[0] || undefined;
     const isSameLanguage = Boolean(
       sourceLanguage &&
-      sourceLanguage.toLowerCase() === profile.preferredLanguage.toLowerCase()
+      sourceLanguage.toLowerCase() === targetLanguage.toLowerCase()
     );
 
     let translatedText = sourceText;
     if (!isSameLanguage) {
       const result = await translate(sourceText, {
         sourceLanguage,
-        targetLanguage: profile.preferredLanguage,
+        targetLanguage,
         sourceCountry: context.countryName,
         targetCountry: profile.countryName,
       });
@@ -83,14 +105,13 @@ export function useRemoteInterpreter(room: Room, profile: Profile | null, enable
       sourceText,
       translatedText,
       sourceLanguage,
-      targetLanguage: profile.preferredLanguage,
+      targetLanguage,
     };
-    const nextTurns = [...turnsRef.current.slice(-39), turn];
-    turnsRef.current = nextTurns;
-    setTurns(nextTurns);
+    const nextTurns = [...turnsRef.current.slice(-79), turn];
+    commitTurns(nextTurns);
 
     if (nextTurns.length >= 2 && nextTurns.length % 2 === 0) {
-      void mediate(nextTurns).then((result) => setMediatorNote(result.note)).catch(() => {});
+      void mediate(nextTurns.slice(-8)).then((result) => setMediatorNote(result.note)).catch(() => {});
     }
 
     if (!isSameLanguage) {
@@ -98,9 +119,7 @@ export function useRemoteInterpreter(room: Room, profile: Profile | null, enable
       speechQueue.current = speechQueue.current
         .then(async () => {
           if (stopped.current || !enabled) return;
-          try {
-            track.setVolume(0.08);
-          } catch {}
+          try { track.setVolume(0.08); } catch {}
           try {
             await play(translatedText);
           } finally {
@@ -115,7 +134,7 @@ export function useRemoteInterpreter(room: Room, profile: Profile | null, enable
     }
 
     if (!stopped.current && enabled) setStatus('Listening');
-  }, [enabled, play, profile]);
+  }, [commitTurns, enabled, play, profile, targetLanguage]);
 
   React.useEffect(() => {
     stopped.current = !enabled;
@@ -228,6 +247,7 @@ export function useRemoteInterpreter(room: Room, profile: Profile | null, enable
       turnsRef.current = [];
       setTurns([]);
       setMediatorNote(null);
+      if (sessionId) clearTranscript(sessionId);
     },
   };
 }
