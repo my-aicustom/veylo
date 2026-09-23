@@ -19,6 +19,21 @@ export function InterpreterPanel({
   const [enabled, setEnabled] = React.useState(true);
   const [open, setOpen] = React.useState(true);
   const [targetLanguage, setTargetLanguage] = React.useState(profile.preferredLanguage);
+  const languageStorageKey = React.useMemo(() => `veylo:room-language:${roomName}`, [roomName]);
+
+  React.useEffect(() => {
+    try {
+      const saved = window.localStorage.getItem(languageStorageKey);
+      if (saved && ALL_LANGUAGE_CODES.includes(saved)) setTargetLanguage(saved);
+    } catch {}
+  }, [languageStorageKey]);
+
+  const changeTargetLanguage = React.useCallback((language: string) => {
+    setTargetLanguage(language);
+    try {
+      window.localStorage.setItem(languageStorageKey, language);
+    } catch {}
+  }, [languageStorageKey]);
 
   const languageDisplay = React.useMemo(() => {
     try {
@@ -60,7 +75,7 @@ export function InterpreterPanel({
               <select
                 aria-label="Translation language"
                 value={targetLanguage}
-                onChange={(event) => setTargetLanguage(event.target.value)}
+                onChange={(event) => changeTargetLanguage(event.target.value)}
               >
                 {ALL_LANGUAGE_CODES.map((code) => (
                   <option key={code} value={code}>
