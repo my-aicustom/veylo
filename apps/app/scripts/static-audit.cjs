@@ -31,6 +31,11 @@ for (const rel of clientFiles) {
   if (text.includes('OPENROUTER_API_KEY')) errors.push(`${rel}: browser source contains OPENROUTER_API_KEY`);
   if (text.includes('openrouter.ai')) errors.push(`${rel}: browser source calls OpenRouter directly`);
 }
-if (!fs.readFileSync(path.join(root,'LICENSE'),'utf8').includes('Apache License')) errors.push('Apache-2.0 LICENSE missing');
+const licensePath = fs.existsSync(path.join(root, 'LICENSE'))
+  ? path.join(root, 'LICENSE')
+  : path.resolve(root, '..', '..', 'LICENSE');
+if (!fs.existsSync(licensePath) || !fs.readFileSync(licensePath, 'utf8').includes('Apache License')) {
+  errors.push('Apache-2.0 LICENSE missing');
+}
 if (errors.length) { console.error(errors.join('\n')); process.exit(1); }
 console.log(`STATIC AUDIT PASSED: ${tsCount} TypeScript/TSX files; JSON valid; browser OpenRouter key boundary clean.`);

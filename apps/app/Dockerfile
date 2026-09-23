@@ -9,6 +9,7 @@ WORKDIR /app
 RUN corepack enable
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
+ENV NEXT_PUBLIC_BASE_PATH=/app
 RUN pnpm build
 
 FROM node:22-alpine AS runner

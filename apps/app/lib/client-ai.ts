@@ -1,6 +1,7 @@
 'use client';
 
 import type { Profile, TranscriptTurn } from './types';
+import { apiUrl } from './paths';
 
 async function fetchJson<T>(url: string, body: unknown, timeoutMs = 45_000): Promise<T> {
   const controller = new AbortController();
@@ -29,7 +30,7 @@ function base64(bytes: Uint8Array) {
 }
 
 export function transcribe(bytes: Uint8Array, language?: string) {
-  return fetchJson<{ text: string; language?: string; duration?: number; usage?: any }>('/api/stt', {
+  return fetchJson<{ text: string; language?: string; duration?: number; usage?: any }>(apiUrl('/api/stt'), {
     audioBase64: base64(bytes), format: 'wav', language,
   });
 }
@@ -40,14 +41,14 @@ export function translate(text: string, args: {
   sourceCountry?: string;
   targetCountry?: string;
 }) {
-  return fetchJson<{ text: string; usage?: any }>('/api/translate', { text, ...args });
+  return fetchJson<{ text: string; usage?: any }>(apiUrl('/api/translate'), { text, ...args });
 }
 
 export async function speak(text: string) {
   const controller = new AbortController();
   const timer = window.setTimeout(() => controller.abort(), 55_000);
   try {
-    const response = await fetch('/api/tts', {
+    const response = await fetch(apiUrl('/api/tts'), {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ text }),
@@ -72,9 +73,9 @@ export function simulate(input: {
   language?: string;
   history: Array<{ speaker: string; sourceText?: string; translatedText?: string }>;
 }) {
-  return fetchJson<{ reply: string }>('/api/simulate', input);
+  return fetchJson<{ reply: string }>(apiUrl('/api/simulate'), input);
 }
 
 export function mediate(turns: TranscriptTurn[]) {
-  return fetchJson<{ note: string | null }>('/api/mediate', { turns });
+  return fetchJson<{ note: string | null }>(apiUrl('/api/mediate'), { turns });
 }

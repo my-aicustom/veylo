@@ -18,6 +18,7 @@ import {
 import { ProfileForm } from '@/components/ProfileForm';
 import { InterpreterPanel } from '@/components/InterpreterPanel';
 import { loadProfile } from '@/lib/profile';
+import { apiUrl } from '@/lib/paths';
 import type { ConnectionDetails, Profile } from '@/lib/types';
 
 export function RoomPageClient({ roomName }: { roomName: string }) {
@@ -36,7 +37,7 @@ export function RoomPageClient({ roomName }: { roomName: string }) {
     if (!profile) return;
     setError('');
     setChoices(values);
-    const response = await fetch('/api/connection-details', {
+    const response = await fetch(apiUrl('/api/connection-details'), {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({

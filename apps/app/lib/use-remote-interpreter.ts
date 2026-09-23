@@ -57,12 +57,21 @@ export function useRemoteInterpreter(room: Room, profile: Profile | null, enable
 
     const context = parseParticipantMetadata(participant.metadata);
     const sourceLanguage = (stt.language || '').split('-')[0] || undefined;
-    const result = await translate(sourceText, {
-      sourceLanguage,
-      targetLanguage: profile.preferredLanguage,
-      sourceCountry: context.countryName,
-      targetCountry: profile.countryName,
-    });
+    const isSameLanguage = Boolean(
+      sourceLanguage &&
+      sourceLanguage.toLowerCase() === profile.preferredLanguage.toLowerCase()
+    );
+
+    let translatedText = sourceText;
+    if (!isSameLanguage) {
+      const result = await translate(sourceText, {
+        sourceLanguage,
+        targetLanguage: profile.preferredLanguage,
+        sourceCountry: context.countryName,
+        targetCountry: profile.countryName,
+      });
+      translatedText = result.text;
+    }
     if (stopped.current || !enabled) return;
 
     const turn: TranscriptTurn = {
@@ -71,7 +80,7 @@ export function useRemoteInterpreter(room: Room, profile: Profile | null, enable
       participantIdentity: participant.identity,
       participantName: participant.name || 'Participant',
       sourceText,
-      translatedText: result.text,
+      translatedText,
       sourceLanguage,
       targetLanguage: profile.preferredLanguage,
     };
@@ -81,12 +90,14 @@ export function useRemoteInterpreter(room: Room, profile: Profile | null, enable
     if (nextTurns.length >= 2 && nextTurns.length % 2 === 0) {
       void mediate(nextTurns).then((result) => setMediatorNote(result.note)).catch(() => {});
     }
-    setStatus('Speaking translation…');
 
-    speechQueue.current = speechQueue.current
-      .then(() => play(result.text))
-      .catch((error) => console.warn('[interpreter] TTS failed', error));
-    await speechQueue.current;
+    if (!isSameLanguage) {
+      setStatus('Speaking translation…');
+      speechQueue.current = speechQueue.current
+        .then(() => play(translatedText))
+        .catch((error) => console.warn('[interpreter] TTS failed', error));
+      await speechQueue.current;
+    }
     if (!stopped.current && enabled) setStatus('Listening');
   }, [enabled, play, profile]);
 
@@ -128,9 +139,13 @@ export function useRemoteInterpreter(room: Room, profile: Profile | null, enable
           preRollMs: 180,
           onPhrase: (phrase) => {
             lane.queue = lane.queue
-              .then(() => processPhrase(phrase.bytes, participant))
+              .then(async () => {
+                try { lane.track.setVolume(0.18); } catch {}
+                await processPhrase(phrase.bytes, participant);
+              })
               .catch((error) => {
                 console.warn('[interpreter] phrase failed', error);
+                try { lane.track.setVolume(1); } catch {}
                 setStatus('AI temporarily unavailable · original audio remains audible');
               });
           },

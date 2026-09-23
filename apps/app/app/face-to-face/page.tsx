@@ -33,8 +33,8 @@ export default function FaceToFacePage() {
     const lang = (detected || '').split('-')[0];
     const myHints = COUNTRY_LANGUAGE_HINTS[profile.countryCode] || [profile.preferredLanguage];
     const theirHints = COUNTRY_LANGUAGE_HINTS[otherCountry] || [otherLanguage];
-    const mine = myHints.includes(lang);
-    const theirs = theirHints.includes(lang);
+    const mine = myHints.includes(lang) || lang === profile.preferredLanguage;
+    const theirs = theirHints.includes(lang) || lang === otherLanguage;
     if (mine && !theirs) return 'you' as const;
     if (theirs && !mine) return 'other' as const;
     return lastSide.current === 'you' ? 'other' : 'you';

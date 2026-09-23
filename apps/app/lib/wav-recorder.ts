@@ -1,3 +1,5 @@
+import { assetUrl } from './paths';
+
 export interface Phrase {
   bytes: Uint8Array;
   durationMs: number;
@@ -43,7 +45,7 @@ export class PhraseRecorder {
 
     if (this.context.audioWorklet) {
       try {
-        await this.context.audioWorklet.addModule('/pcm-worklet.js');
+        await this.context.audioWorklet.addModule(assetUrl('/pcm-worklet.js'));
         const worklet = new AudioWorkletNode(this.context, 'veylo-pcm-capture');
         worklet.port.onmessage = (event) => this.handle(new Float32Array(event.data), this.context!.sampleRate);
         this.node = worklet;
