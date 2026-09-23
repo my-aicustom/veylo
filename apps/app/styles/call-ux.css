@@ -11,6 +11,36 @@
 .call-actions { display: flex; align-items: center; gap: 10px; }
 .share-notice { min-width: 96px; text-align: right; color: var(--muted); font-size: 11px; }
 .room-code { justify-self: center; }
+
+.call-health {
+  display:inline-flex;
+  align-items:center;
+  gap:7px;
+  min-height:30px;
+  padding:0 10px;
+  border:1px solid var(--line);
+  border-radius:999px;
+  background:#101113;
+  color:var(--muted);
+  font-size:11px;
+  white-space:nowrap;
+}
+.call-health-action {
+  cursor:pointer;
+  font:inherit;
+}
+.health-dot {
+  width:7px;
+  height:7px;
+  border-radius:999px;
+  background:#666;
+}
+.call-health[data-state="good"] .health-dot { background:var(--accent); }
+.call-health[data-state="attention"] { color:#f1d58a; border-color:#5b5132; }
+.call-health[data-state="attention"] .health-dot { background:#e4bd57; }
+.call-health[data-state="danger"] { color:#ffb2b2; border-color:rgba(246,109,109,.42); }
+.call-health[data-state="danger"] .health-dot { background:var(--danger); }
+
 .transcript-actions { display: flex; gap: 14px; align-items: center; padding: 12px 15px 14px; border-top: 1px solid var(--line); }
 .transcript-actions .text-button { margin: 0; }
 .transcript-actions .text-button:first-child { color: var(--text); }
@@ -43,17 +73,26 @@
   border:0;
 }
 .sim-translation { margin-top: 7px !important; color: var(--muted) !important; font-size: 13px !important; line-height: 1.45; }
+
+@media (max-width: 980px) {
+  .call-health { padding-inline:8px; }
+  .share-notice { display:none; }
+}
+
 @media (max-width: 860px) {
   .call-topbar { grid-template-columns: auto 1fr auto; }
   .room-code { display: none; }
   .call-presence { justify-self: center; }
 }
+
 @media (max-width: 620px) {
   .call-topbar { grid-template-columns: auto 1fr; gap: 10px; padding-inline: 12px; }
   .call-presence { display: none; }
-  .call-actions { justify-self: end; }
-  .share-notice { display: none; }
+  .call-actions { justify-self: end; gap:6px; }
   .call-actions .ghost { padding-inline: 10px; }
+  .call-health { min-height:28px; padding-inline:8px; }
+  .call-health:not(.call-health-action) { max-width:32px; overflow:hidden; color:transparent; gap:0; }
+  .call-health:not(.call-health-action) .health-dot { flex:0 0 auto; }
   .transcript-card-head { align-items:flex-start; }
   .transcript-card-actions { flex-wrap:wrap; justify-content:flex-end; }
 }
