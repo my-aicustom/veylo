@@ -1,4 +1,4 @@
-# VEYLO — v0.4.3
+# VEYLO — v0.4.4
 
 > Working codename. Internal multilingual communication product by MY-AI.
 
@@ -10,6 +10,14 @@ Veylo combines a fast Astro marketing homepage with a self-hosted LiveKit realti
 - **Face-to-Face** — one device acts as interpreter between two people in the same room.
 - **AI Simulation** — practice with an AI counterpart using country, role and scenario context.
 
+## v0.4.4 call health
+
+- Live Call now exposes local LiveKit connection quality in the call bar
+- explicit `Reconnecting…` and `Offline` states instead of silently degrading
+- browser autoplay failures surface an `Enable sound` action backed by `room.startAudio()`
+- invite sharing checks native Web Share support and falls back to clipboard
+- responsive health UI collapses to a compact status dot on small screens
+
 ## v0.4.3 session continuity
 
 - target translation language can be changed while a Live Call is running
@@ -18,16 +26,6 @@ Veylo combines a fast Astro marketing homepage with a self-hosted LiveKit realti
 - Face-to-Face transcript is also restored locally until explicitly cleared
 - transcript persistence is best-effort and never blocks an active conversation
 - session history remains on the user's device; it is not uploaded as a separate Veylo history service
-
-## v0.4.2 call experience
-
-- participant-aware call topbar with native share/copy invite flow
-- listener-side transcript export
-- Face-to-Face transcript download
-- AI Simulation shows a listener-language subtitle under the counterpart's original response
-- remote original audio stays at normal volume and is ducked only while translated TTS is speaking
-- same-language calls are not unnecessarily attenuated
-- responsive call chrome and accessibility live regions
 
 ## Local development
 
