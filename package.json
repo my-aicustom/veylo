@@ -1,6 +1,6 @@
 {
   "name": "veylo",
-  "version": "0.4.2",
+  "version": "0.4.3",
   "private": true,
   "description": "Veylo internal multilingual communication: Astro marketing site + self-hosted LiveKit application + OpenRouter interpretation.",
   "license": "Apache-2.0",
