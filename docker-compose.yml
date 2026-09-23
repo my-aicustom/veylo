@@ -1,0 +1,40 @@
+services:
+  livekit:
+    image: livekit/livekit-server:latest
+    command: --config /etc/livekit.yaml
+    volumes:
+      - ./infra/livekit.yaml:/etc/livekit.yaml:ro
+    ports:
+      - "7880:7880"
+      - "7881:7881"
+      - "50000-50100:50000-50100/udp"
+    restart: unless-stopped
+
+  app:
+    build: ./apps/app
+    env_file: .env
+    environment:
+      NEXT_PUBLIC_BASE_PATH: /app
+    expose:
+      - "3000"
+    depends_on:
+      - livekit
+    restart: unless-stopped
+
+  site:
+    build:
+      context: ./apps/site
+    expose:
+      - "80"
+    restart: unless-stopped
+
+  web:
+    image: nginx:1.27-alpine
+    volumes:
+      - ./deploy/nginx.conf:/etc/nginx/conf.d/default.conf:ro
+    ports:
+      - "8080:80"
+    depends_on:
+      - site
+      - app
+    restart: unless-stopped
