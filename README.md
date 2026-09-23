@@ -1,4 +1,4 @@
-# VEYLO — v0.4.4
+# VEYLO — v0.4.5
 
 > Working codename. Internal multilingual communication product by MY-AI.
 
@@ -9,23 +9,25 @@ Veylo combines a fast Astro marketing homepage with a self-hosted LiveKit realti
 - **Live Call** — create/join a Veylo video room with listener-side interpretation.
 - **Face-to-Face** — one device acts as interpreter between two people in the same room.
 - **AI Simulation** — practice with an AI counterpart using country, role and scenario context.
+- **Diagnostics** — test browser media, WebRTC, server config, LiveKit reachability, and OpenRouter model availability.
+
+## v0.4.5 diagnostics
+
+- new `/app/diagnostics` page reachable from the app home
+- browser checks for online state, secure context, WebRTC, media APIs, mic/camera permissions, and detected devices
+- server config check exposes only booleans/metadata; secrets are never returned
+- deep OpenRouter check uses `GET /api/v1/models` instead of paid inference
+- selected STT/translation/TTS model IDs are verified against the OpenRouter model catalog
+- LiveKit reachability is tested from the app server with a short timeout
+- diagnostics UI is responsive and designed for local troubleshooting
 
 ## v0.4.4 call health
 
-- Live Call now exposes local LiveKit connection quality in the call bar
+- Live Call exposes local LiveKit connection quality in the call bar
 - explicit `Reconnecting…` and `Offline` states instead of silently degrading
 - browser autoplay failures surface an `Enable sound` action backed by `room.startAudio()`
 - invite sharing checks native Web Share support and falls back to clipboard
 - responsive health UI collapses to a compact status dot on small screens
-
-## v0.4.3 session continuity
-
-- target translation language can be changed while a Live Call is running
-- per-room language override survives refresh/reconnect on the same browser
-- Live Call transcripts are stored locally per room and restored after refresh
-- Face-to-Face transcript is also restored locally until explicitly cleared
-- transcript persistence is best-effort and never blocks an active conversation
-- session history remains on the user's device; it is not uploaded as a separate Veylo history service
 
 ## Local development
 
@@ -37,6 +39,7 @@ pnpm dev
 
 - Astro site: http://localhost:4321
 - Veylo app: http://localhost:3000/app
+- Diagnostics: http://localhost:3000/app/diagnostics
 - LiveKit: ws://localhost:7880 when started separately or through Docker Compose
 
 To run LiveKit locally:
