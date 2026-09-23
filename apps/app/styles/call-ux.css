@@ -4,68 +4,26 @@
   align-items: center;
   gap: 16px;
 }
-
 .call-brand { display: flex; gap: 10px; align-items: baseline; }
 .call-brand span { color: var(--muted); font-size: 12px; }
-.call-presence {
-  display: inline-flex;
-  align-items: center;
-  gap: 7px;
-  color: var(--muted);
-  font-size: 12px;
-  white-space: nowrap;
-}
-.presence-dot {
-  width: 7px;
-  height: 7px;
-  border-radius: 999px;
-  background: var(--accent);
-  box-shadow: 0 0 0 4px rgba(217,255,99,.08);
-}
-.call-actions {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-}
-.share-notice {
-  min-width: 96px;
-  text-align: right;
-  color: var(--muted);
-  font-size: 11px;
-}
+.call-presence { display: inline-flex; align-items: center; gap: 7px; color: var(--muted); font-size: 12px; white-space: nowrap; }
+.presence-dot { width: 7px; height: 7px; border-radius: 999px; background: var(--accent); box-shadow: 0 0 0 4px rgba(217,255,99,.08); }
+.call-actions { display: flex; align-items: center; gap: 10px; }
+.share-notice { min-width: 96px; text-align: right; color: var(--muted); font-size: 11px; }
 .room-code { justify-self: center; }
-
-.transcript-actions {
-  display: flex;
-  gap: 14px;
-  align-items: center;
-  padding: 12px 15px 14px;
-  border-top: 1px solid var(--line);
-}
+.transcript-actions { display: flex; gap: 14px; align-items: center; padding: 12px 15px 14px; border-top: 1px solid var(--line); }
 .transcript-actions .text-button { margin: 0; }
 .transcript-actions .text-button:first-child { color: var(--text); }
-
-.sim-translation {
-  margin-top: 7px !important;
-  color: var(--muted) !important;
-  font-size: 13px !important;
-  line-height: 1.45;
-}
-
+.transcript-card-head { display:flex; align-items:center; justify-content:space-between; gap:12px; margin-bottom:6px; }
+.transcript-card-head .eyebrow { margin-bottom:0; }
+.sim-translation { margin-top: 7px !important; color: var(--muted) !important; font-size: 13px !important; line-height: 1.45; }
 @media (max-width: 860px) {
-  .call-topbar {
-    grid-template-columns: auto 1fr auto;
-  }
+  .call-topbar { grid-template-columns: auto 1fr auto; }
   .room-code { display: none; }
   .call-presence { justify-self: center; }
 }
-
 @media (max-width: 620px) {
-  .call-topbar {
-    grid-template-columns: auto 1fr;
-    gap: 10px;
-    padding-inline: 12px;
-  }
+  .call-topbar { grid-template-columns: auto 1fr; gap: 10px; padding-inline: 12px; }
   .call-presence { display: none; }
   .call-actions { justify-self: end; }
   .share-notice { display: none; }
