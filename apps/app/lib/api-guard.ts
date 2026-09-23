@@ -11,14 +11,23 @@ const counters = globalThis.__veyloRateLimits ?? new Map<string, Counter>();
 globalThis.__veyloRateLimits = counters;
 
 function clientId(request: NextRequest) {
-  const forwarded = request.headers.get('x-forwarded-for')?.split(',')[0]?.trim();
-  return forwarded || request.headers.get('x-real-ip') || 'unknown';
+  // In production, nginx overwrites X-Real-IP with the socket peer address.
+  // Direct dev requests fall back to a stable local bucket.
+  return request.headers.get('x-real-ip')?.trim() || 'direct';
 }
 
 function expectedOrigin(request: NextRequest) {
-  const host = request.headers.get('x-forwarded-host') || request.headers.get('host');
-  const proto = request.headers.get('x-forwarded-proto') || request.nextUrl.protocol.replace(':', '');
-  return host ? `${proto}://${host}` : null;
+  const forwardedHost = request.headers.get('x-forwarded-host');
+  const forwardedProto = request.headers.get('x-forwarded-proto');
+  if (forwardedHost && forwardedProto) return `${forwardedProto}://${forwardedHost}`;
+  return request.nextUrl.origin;
+}
+
+function cleanupExpired(now: number) {
+  if (counters.size < 5_000) return;
+  for (const [key, value] of counters) {
+    if (value.resetAt <= now) counters.delete(key);
+  }
 }
 
 export function guardApi(
@@ -33,6 +42,8 @@ export function guardApi(
   }
 
   const now = Date.now();
+  cleanupExpired(now);
+
   const windowMs = options.windowMs ?? 60_000;
   const key = `${bucket}:${clientId(request)}`;
   const current = counters.get(key);
