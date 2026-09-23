@@ -22,7 +22,8 @@ export function InterpreterPanel({
 
   const languageDisplay = React.useMemo(() => {
     try {
-      return new Intl.DisplayNames([navigator.language || 'en'], { type: 'language' });
+      const locale = typeof navigator !== 'undefined' && navigator.language ? navigator.language : 'en';
+      return new Intl.DisplayNames([locale], { type: 'language' });
     } catch {
       return null;
     }
