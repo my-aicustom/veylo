@@ -3,6 +3,7 @@
 import * as React from 'react';
 import { useRouter } from 'next/navigation';
 import { apiUrl } from '@/lib/paths';
+import { AiPipelineTester } from '@/components/AiPipelineTester';
 
 type Health = {
   app: string;
@@ -170,6 +171,8 @@ export default function DiagnosticsPage() {
           ))}
         </article>
       </section>
+
+      <AiPipelineTester />
 
       <section className="diag-guidance">
         <strong>Interpretation</strong>
