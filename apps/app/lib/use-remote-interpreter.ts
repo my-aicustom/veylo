@@ -20,6 +20,8 @@ type Lane = {
   track: RemoteAudioTrack;
 };
 
+const INTERPRETED_ORIGINAL_VOLUME = 0.18;
+
 export function useRemoteInterpreter(room: Room, profile: Profile | null, enabled: boolean) {
   const [turns, setTurns] = React.useState<TranscriptTurn[]>([]);
   const [status, setStatus] = React.useState('Interpreter off');
@@ -28,11 +30,24 @@ export function useRemoteInterpreter(room: Room, profile: Profile | null, enable
   const lanes = React.useRef(new Map<string, Lane>());
   const speechQueue = React.useRef<Promise<void>>(Promise.resolve());
   const stopped = React.useRef(false);
+  const activeAudio = React.useRef<HTMLAudioElement | null>(null);
+
+  const stopActiveSpeech = React.useCallback(() => {
+    const audio = activeAudio.current;
+    if (audio) {
+      try { audio.pause(); } catch {}
+      activeAudio.current = null;
+    }
+  }, []);
 
   const play = React.useCallback(async (text: string) => {
+    if (stopped.current) return;
     const blob = await speak(text);
+    if (stopped.current) return;
+
     const url = URL.createObjectURL(blob);
     const audio = new Audio(url);
+    activeAudio.current = audio;
     try {
       await audio.play();
       await new Promise<void>((resolve) => {
@@ -41,6 +56,7 @@ export function useRemoteInterpreter(room: Room, profile: Profile | null, enable
         audio.onpause = () => resolve();
       });
     } finally {
+      if (activeAudio.current === audio) activeAudio.current = null;
       URL.revokeObjectURL(url);
     }
   }, []);
@@ -48,19 +64,29 @@ export function useRemoteInterpreter(room: Room, profile: Profile | null, enable
   const processPhrase = React.useCallback(async (
     bytes: Uint8Array,
     participant: RemoteParticipant,
+    track: RemoteAudioTrack,
   ) => {
     if (!profile || stopped.current || !enabled) return;
+
     setStatus(`Understanding ${participant.name || 'participant'}…`);
     const stt = await transcribe(bytes);
     const sourceText = (stt.text || '').trim();
     if (!sourceText || stopped.current || !enabled) return;
 
     const context = parseParticipantMetadata(participant.metadata);
-    const sourceLanguage = (stt.language || '').split('-')[0] || undefined;
-    const isSameLanguage = Boolean(
-      sourceLanguage &&
-      sourceLanguage.toLowerCase() === profile.preferredLanguage.toLowerCase()
-    );
+    const sourceLanguage = (stt.language || '').split('-')[0]?.toLowerCase() || undefined;
+    const targetLanguage = profile.preferredLanguage.toLowerCase();
+    const isSameLanguage = Boolean(sourceLanguage && sourceLanguage === targetLanguage);
+
+    // If both people are already speaking the listener's language, preserve the
+    // original audio at full volume and skip unnecessary translation/TTS.
+    if (isSameLanguage) {
+      try { track.setVolume(1); } catch {}
+    } else {
+      // Once a foreign language is detected, keep some of the original audio
+      // for prosody/context while making room for the interpreted voice.
+      try { track.setVolume(INTERPRETED_ORIGINAL_VOLUME); } catch {}
+    }
 
     let translatedText = sourceText;
     if (!isSameLanguage) {
@@ -72,6 +98,7 @@ export function useRemoteInterpreter(room: Room, profile: Profile | null, enable
       });
       translatedText = result.text;
     }
+
     if (stopped.current || !enabled) return;
 
     const turn: TranscriptTurn = {
@@ -87,23 +114,36 @@ export function useRemoteInterpreter(room: Room, profile: Profile | null, enable
     const nextTurns = [...turnsRef.current.slice(-39), turn];
     turnsRef.current = nextTurns;
     setTurns(nextTurns);
+
     if (nextTurns.length >= 2 && nextTurns.length % 2 === 0) {
-      void mediate(nextTurns).then((result) => setMediatorNote(result.note)).catch(() => {});
+      void mediate(nextTurns)
+        .then((result) => {
+          if (!stopped.current) setMediatorNote(result.note);
+        })
+        .catch(() => {});
     }
 
     if (!isSameLanguage) {
       setStatus('Speaking translation…');
       speechQueue.current = speechQueue.current
         .then(() => play(translatedText))
-        .catch((error) => console.warn('[interpreter] TTS failed', error));
+        .catch((error) => {
+          console.warn('[interpreter] TTS failed', error);
+          try { track.setVolume(1); } catch {}
+          setStatus('Voice translation unavailable · original audio restored');
+        });
       await speechQueue.current;
     }
+
     if (!stopped.current && enabled) setStatus('Listening');
   }, [enabled, play, profile]);
 
   React.useEffect(() => {
     stopped.current = !enabled;
+
     if (!enabled || !profile) {
+      stopActiveSpeech();
+      speechQueue.current = Promise.resolve();
       setStatus('Interpreter off');
       for (const lane of lanes.current.values()) {
         lane.recorder.stop();
@@ -124,8 +164,10 @@ export function useRemoteInterpreter(room: Room, profile: Profile | null, enable
       const key = publication.trackSid || track.mediaStreamTrack.id;
       if (lanes.current.has(key)) return;
 
-      // Keep a little original audio under the interpreter so users retain prosody/context.
-      try { track.setVolume(0.18); } catch {}
+      // Do not pre-duck. The first phrase establishes whether translation is
+      // actually needed. This avoids making same-language calls unnecessarily quiet.
+      try { track.setVolume(1); } catch {}
+
       const clone = track.mediaStreamTrack.clone();
       const stream = new MediaStream([clone]);
       const lane: Lane = {
@@ -139,10 +181,7 @@ export function useRemoteInterpreter(room: Room, profile: Profile | null, enable
           preRollMs: 180,
           onPhrase: (phrase) => {
             lane.queue = lane.queue
-              .then(async () => {
-                try { lane.track.setVolume(0.18); } catch {}
-                await processPhrase(phrase.bytes, participant);
-              })
+              .then(() => processPhrase(phrase.bytes, participant, lane.track))
               .catch((error) => {
                 console.warn('[interpreter] phrase failed', error);
                 try { lane.track.setVolume(1); } catch {}
@@ -151,6 +190,7 @@ export function useRemoteInterpreter(room: Room, profile: Profile | null, enable
           },
         }),
       };
+
       lanes.current.set(key, lane);
       try {
         await lane.recorder.start();
@@ -175,13 +215,18 @@ export function useRemoteInterpreter(room: Room, profile: Profile | null, enable
       publication: RemoteTrackPublication,
       participant: RemoteParticipant,
     ) => {
-      if (track.kind === Track.Kind.Audio) void startLane(track as RemoteAudioTrack, publication, participant);
+      if (track.kind === Track.Kind.Audio) {
+        void startLane(track as RemoteAudioTrack, publication, participant);
+      }
     };
+
     const onUnsubscribed = (
       track: any,
       publication: RemoteTrackPublication,
     ) => {
-      if (track.kind === Track.Kind.Audio) stopLane(track as RemoteAudioTrack, publication);
+      if (track.kind === Track.Kind.Audio) {
+        stopLane(track as RemoteAudioTrack, publication);
+      }
     };
 
     room.on(RoomEvent.TrackSubscribed, onSubscribed);
@@ -192,7 +237,11 @@ export function useRemoteInterpreter(room: Room, profile: Profile | null, enable
       participant.trackPublications.forEach((publication) => {
         const track = publication.track;
         if (track?.kind === Track.Kind.Audio) {
-          void startLane(track as RemoteAudioTrack, publication as RemoteTrackPublication, participant);
+          void startLane(
+            track as RemoteAudioTrack,
+            publication as RemoteTrackPublication,
+            participant,
+          );
         }
       });
     });
@@ -201,13 +250,24 @@ export function useRemoteInterpreter(room: Room, profile: Profile | null, enable
       room.off(RoomEvent.TrackSubscribed, onSubscribed);
       room.off(RoomEvent.TrackUnsubscribed, onUnsubscribed);
       stopped.current = true;
+      stopActiveSpeech();
+      speechQueue.current = Promise.resolve();
       for (const lane of lanes.current.values()) {
         lane.recorder.stop();
         try { lane.track.setVolume(1); } catch {}
       }
       lanes.current.clear();
     };
-  }, [enabled, processPhrase, profile, room]);
+  }, [enabled, processPhrase, profile, room, stopActiveSpeech]);
 
-  return { turns, status, mediatorNote, clear: () => { turnsRef.current = []; setTurns([]); setMediatorNote(null); } };
+  return {
+    turns,
+    status,
+    mediatorNote,
+    clear: () => {
+      turnsRef.current = [];
+      setTurns([]);
+      setMediatorNote(null);
+    },
+  };
 }
