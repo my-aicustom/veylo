@@ -3,6 +3,7 @@
 import * as React from 'react';
 import { useParticipants } from '@livekit/components-react';
 import type { Room } from 'livekit-client';
+import { CallHealth } from './CallHealth';
 
 export function CallTopbar({ room, roomName }: { room: Room; roomName: string }) {
   const participants = useParticipants({ room });
@@ -13,12 +14,13 @@ export function CallTopbar({ room, roomName }: { room: Room; roomName: string })
   async function shareInvite() {
     if (!inviteUrl) return;
     try {
-      if (navigator.share) {
-        await navigator.share({
-          title: 'Join my Veylo conversation',
-          text: `Join room ${roomName} on Veylo.`,
-          url: inviteUrl,
-        });
+      const payload = {
+        title: 'Join my Veylo conversation',
+        text: `Join room ${roomName} on Veylo.`,
+        url: inviteUrl,
+      };
+      if (navigator.share && (!navigator.canShare || navigator.canShare(payload))) {
+        await navigator.share(payload);
         setNotice('Invite shared');
       } else {
         await navigator.clipboard.writeText(inviteUrl);
@@ -40,12 +42,16 @@ export function CallTopbar({ room, roomName }: { room: Room; roomName: string })
   return (
     <div className="call-topbar">
       <div className="call-brand"><strong>VEYLO</strong><span>Live Interpreter</span></div>
+
       <div className="call-presence" aria-label={`${participants.length} participants in room`}>
         <span className="presence-dot" aria-hidden="true" />
         {participants.length} {participants.length === 1 ? 'person' : 'people'}
       </div>
+
       <div className="room-code">{roomName}</div>
+
       <div className="call-actions">
+        <CallHealth room={room} />
         <span className="share-notice" aria-live="polite">{notice}</span>
         <button className="ghost small" onClick={shareInvite}>Share invite</button>
       </div>
