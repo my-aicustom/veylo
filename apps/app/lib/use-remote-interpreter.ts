@@ -48,6 +48,7 @@ export function useRemoteInterpreter(room: Room, profile: Profile | null, enable
   const processPhrase = React.useCallback(async (
     bytes: Uint8Array,
     participant: RemoteParticipant,
+    track: RemoteAudioTrack,
   ) => {
     if (!profile || stopped.current || !enabled) return;
     setStatus(`Understanding ${participant.name || 'participant'}…`);
@@ -87,6 +88,7 @@ export function useRemoteInterpreter(room: Room, profile: Profile | null, enable
     const nextTurns = [...turnsRef.current.slice(-39), turn];
     turnsRef.current = nextTurns;
     setTurns(nextTurns);
+
     if (nextTurns.length >= 2 && nextTurns.length % 2 === 0) {
       void mediate(nextTurns).then((result) => setMediatorNote(result.note)).catch(() => {});
     }
@@ -94,10 +96,24 @@ export function useRemoteInterpreter(room: Room, profile: Profile | null, enable
     if (!isSameLanguage) {
       setStatus('Speaking translation…');
       speechQueue.current = speechQueue.current
-        .then(() => play(translatedText))
-        .catch((error) => console.warn('[interpreter] TTS failed', error));
+        .then(async () => {
+          if (stopped.current || !enabled) return;
+          try {
+            track.setVolume(0.08);
+          } catch {}
+          try {
+            await play(translatedText);
+          } finally {
+            try { track.setVolume(1); } catch {}
+          }
+        })
+        .catch((error) => {
+          try { track.setVolume(1); } catch {}
+          console.warn('[interpreter] TTS failed', error);
+        });
       await speechQueue.current;
     }
+
     if (!stopped.current && enabled) setStatus('Listening');
   }, [enabled, play, profile]);
 
@@ -124,8 +140,7 @@ export function useRemoteInterpreter(room: Room, profile: Profile | null, enable
       const key = publication.trackSid || track.mediaStreamTrack.id;
       if (lanes.current.has(key)) return;
 
-      // Keep a little original audio under the interpreter so users retain prosody/context.
-      try { track.setVolume(0.18); } catch {}
+      try { track.setVolume(1); } catch {}
       const clone = track.mediaStreamTrack.clone();
       const stream = new MediaStream([clone]);
       const lane: Lane = {
@@ -139,10 +154,7 @@ export function useRemoteInterpreter(room: Room, profile: Profile | null, enable
           preRollMs: 180,
           onPhrase: (phrase) => {
             lane.queue = lane.queue
-              .then(async () => {
-                try { lane.track.setVolume(0.18); } catch {}
-                await processPhrase(phrase.bytes, participant);
-              })
+              .then(() => processPhrase(phrase.bytes, participant, lane.track))
               .catch((error) => {
                 console.warn('[interpreter] phrase failed', error);
                 try { lane.track.setVolume(1); } catch {}
@@ -187,7 +199,6 @@ export function useRemoteInterpreter(room: Room, profile: Profile | null, enable
     room.on(RoomEvent.TrackSubscribed, onSubscribed);
     room.on(RoomEvent.TrackUnsubscribed, onUnsubscribed);
 
-    // Handle tracks that were already subscribed before the interpreter was toggled on.
     room.remoteParticipants.forEach((participant) => {
       participant.trackPublications.forEach((publication) => {
         const track = publication.track;
@@ -209,5 +220,14 @@ export function useRemoteInterpreter(room: Room, profile: Profile | null, enable
     };
   }, [enabled, processPhrase, profile, room]);
 
-  return { turns, status, mediatorNote, clear: () => { turnsRef.current = []; setTurns([]); setMediatorNote(null); } };
+  return {
+    turns,
+    status,
+    mediatorNote,
+    clear: () => {
+      turnsRef.current = [];
+      setTurns([]);
+      setMediatorNote(null);
+    },
+  };
 }
