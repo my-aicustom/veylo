@@ -69,7 +69,12 @@ export default function HomePage() {
         <article className="mode-card"><span>02</span><h2>Face-to-Face</h2><p>Use one device as an interpreter between two people in the same room.</p><button className="ghost" onClick={() => router.push('/face-to-face')}>Open mode</button></article>
         <article className="mode-card"><span>03</span><h2>AI Simulation</h2><p>Practice a business conversation with an AI counterpart from any country.</p><button className="ghost" onClick={() => router.push('/simulation')}>Open mode</button></article>
       </section>
-      <footer className="home-footer"><span>Self-hosted communication</span><span>OpenRouter inference</span><span>No user accounts</span></footer>
+      <footer className="home-footer">
+        <span>Self-hosted communication</span>
+        <span>OpenRouter inference</span>
+        <span>No user accounts</span>
+        <button className="footer-link" onClick={() => router.push('/diagnostics')}>Diagnostics</button>
+      </footer>
     </main>
   );
 }
