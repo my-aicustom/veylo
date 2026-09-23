@@ -1,4 +1,5 @@
 import '@/styles/globals.css';
+import '@/styles/call-ux.css';
 import '@livekit/components-styles';
 import '@livekit/components-styles/prefabs';
 import type { Metadata, Viewport } from 'next';
