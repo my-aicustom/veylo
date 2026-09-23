@@ -34,10 +34,19 @@ export default function DiagnosticsPage() {
   const router = useRouter();
   const [health, setHealth] = React.useState<Health | null>(null);
   const [browser, setBrowser] = React.useState<BrowserChecks | null>(null);
+  const [runtime, setRuntime] = React.useState<{ online: boolean; secureContext: boolean } | null>(null);
   const [running, setRunning] = React.useState(false);
   const [error, setError] = React.useState('');
 
   React.useEffect(() => {
+    setRuntime({ online: navigator.onLine, secureContext: window.isSecureContext });
+
+    const onOnline = () => setRuntime((current) => ({ online: true, secureContext: current?.secureContext ?? window.isSecureContext }));
+    const onOffline = () => setRuntime((current) => ({ online: false, secureContext: current?.secureContext ?? window.isSecureContext }));
+
+    window.addEventListener('online', onOnline);
+    window.addEventListener('offline', onOffline);
+
     fetch(apiUrl('/api/health'), { cache: 'no-store' })
       .then(async (response) => {
         const body = await response.json();
@@ -45,6 +54,11 @@ export default function DiagnosticsPage() {
         setHealth(body);
       })
       .catch((reason) => setError(reason instanceof Error ? reason.message : String(reason)));
+
+    return () => {
+      window.removeEventListener('online', onOnline);
+      window.removeEventListener('offline', onOffline);
+    };
   }, []);
 
   async function runChecks() {
@@ -83,6 +97,7 @@ export default function DiagnosticsPage() {
       }
 
       setBrowser(basic);
+      setRuntime({ online: basic.online, secureContext: basic.secureContext });
 
       const response = await fetch(apiUrl('/api/health?deep=1'), { cache: 'no-store' });
       const body = await response.json();
@@ -117,8 +132,8 @@ export default function DiagnosticsPage() {
       <section className="diagnostics-grid">
         <article className="diag-card">
           <div className="eyebrow">BROWSER</div>
-          <Diag label="Online" value={browser ? browser.online : navigator.onLine} />
-          <Diag label="Secure context" value={browser ? browser.secureContext : window.isSecureContext} />
+          <Diag label="Online" value={runtime?.online} pending={!runtime} />
+          <Diag label="Secure context" value={runtime?.secureContext} pending={!runtime} />
           <Diag label="WebRTC" value={browser?.webRtc} pending={!browser} />
           <Diag label="Media API" value={browser?.mediaDevices} pending={!browser} />
           <Diag label="Microphone" text={browser?.microphone || 'Run diagnostics'} pending={!browser} />
