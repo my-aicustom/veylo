@@ -15,6 +15,7 @@ import {
   VideoPresets,
   type RoomOptions,
 } from 'livekit-client';
+import { CallTopbar } from '@/components/CallTopbar';
 import { ProfileForm } from '@/components/ProfileForm';
 import { InterpreterPanel } from '@/components/InterpreterPanel';
 import { loadProfile } from '@/lib/profile';
@@ -155,14 +156,10 @@ function ConnectedRoom({ profile, choices, connection }: {
   return (
     <main className="call-shell" data-lk-theme="default">
       <RoomContext.Provider value={room}>
-        <div className="call-topbar">
-          <div><strong>VEYLO</strong><span>Live Interpreter</span></div>
-          <div className="room-code">{connection.roomName}</div>
-          <button className="ghost small" onClick={() => navigator.clipboard.writeText(window.location.href)}>Copy invite link</button>
-        </div>
+        <CallTopbar room={room} roomName={connection.roomName} />
         <div className="video-stage">
           <VideoConference />
-          <InterpreterPanel room={room} profile={profile} />
+          <InterpreterPanel room={room} profile={profile} roomName={connection.roomName} />
         </div>
       </RoomContext.Provider>
     </main>

@@ -6,6 +6,7 @@ import { ALL_LANGUAGE_CODES, COUNTRIES, COUNTRY_LANGUAGE_HINTS } from '@/lib/cou
 import { countryName, defaultLanguage, loadProfile } from '@/lib/profile';
 import { PhraseRecorder } from '@/lib/wav-recorder';
 import { speak, transcribe, translate } from '@/lib/client-ai';
+import { downloadTranscript } from '@/lib/transcript-export';
 import type { Profile, TranscriptTurn } from '@/lib/types';
 import { ProfileForm } from '@/components/ProfileForm';
 
@@ -77,9 +78,13 @@ export default function FaceToFacePage() {
     });
     if (!alive.current) return;
     const turn: TranscriptTurn = {
-      id: crypto.randomUUID(), at: new Date().toISOString(),
+      id: crypto.randomUUID(),
+      at: new Date().toISOString(),
       participantName: side === 'you' ? profile.name : otherName,
-      sourceText, translatedText: result.text, sourceLanguage: detected, targetLanguage,
+      sourceText,
+      translatedText: result.text,
+      sourceLanguage: detected,
+      targetLanguage,
     };
     setTurns((current) => [...current.slice(-49), turn]);
     setStatus('Speaking translation…');
@@ -96,16 +101,21 @@ export default function FaceToFacePage() {
       alive.current = true;
       queueRef.current = Promise.resolve();
       const recorder = new PhraseRecorder(stream, {
-        silenceMs: 600, minSpeechMs: 280, maxPhraseMs: 5000, threshold: 0.015,
+        silenceMs: 600,
+        minSpeechMs: 280,
+        maxPhraseMs: 5000,
+        threshold: 0.015,
         onPhrase: (phrase) => {
           queueRef.current = queueRef.current.then(() => process(phrase.bytes)).catch((error) => {
-            console.warn(error); setStatus('AI error · try again');
+            console.warn(error);
+            setStatus('AI error · try again');
           });
         },
       });
       recorderRef.current = recorder;
       await recorder.start();
-      setRunning(true); setStatus('Listening');
+      setRunning(true);
+      setStatus('Listening');
     } catch (error) {
       alive.current = false;
       setStatus(error instanceof Error ? error.message : 'Could not start microphone');
@@ -114,8 +124,10 @@ export default function FaceToFacePage() {
 
   function stop() {
     alive.current = false;
-    recorderRef.current?.stop(); recorderRef.current = null;
-    setRunning(false); setStatus('Stopped');
+    recorderRef.current?.stop();
+    recorderRef.current = null;
+    setRunning(false);
+    setStatus('Stopped');
   }
 
   if (!ready) return <main className="center-screen">Loading…</main>;
@@ -123,7 +135,11 @@ export default function FaceToFacePage() {
 
   return (
     <main className="tool-shell">
-      <header className="tool-header"><button className="ghost small" onClick={() => router.push('/')}>← Home</button><div><strong>Face-to-Face</strong><span>{status}</span></div></header>
+      <header className="tool-header">
+        <button className="ghost small" onClick={() => router.push('/')}>← Home</button>
+        <div><strong>Face-to-Face</strong><span aria-live="polite">{status}</span></div>
+      </header>
+
       <section className="tool-grid">
         <div className="setup-card">
           <div className="eyebrow">ONE DEVICE / TWO PEOPLE</div>
@@ -133,12 +149,30 @@ export default function FaceToFacePage() {
             <label><span>Country</span><select value={otherCountry} disabled={running} onChange={(e) => setOtherCountry(e.target.value)}>{COUNTRIES.map((c) => <option key={c.code} value={c.code}>{c.name}</option>)}</select></label>
             <label><span>Their output language</span><select value={otherLanguage} disabled={running} onChange={(e) => setOtherLanguage(e.target.value)}>{ALL_LANGUAGE_CODES.map((lang) => <option key={lang} value={lang}>{lang.toUpperCase()}</option>)}</select></label>
           </div>
-          <div className="route-card"><div><strong>{profile.name}</strong><span>{profile.countryName} · {profile.preferredLanguage.toUpperCase()}</span></div><span>⇄</span><div><strong>{otherName}</strong><span>{countryName(otherCountry)} · {otherLanguage.toUpperCase()}</span></div></div>
+          <div className="route-card">
+            <div><strong>{profile.name}</strong><span>{profile.countryName} · {profile.preferredLanguage.toUpperCase()}</span></div>
+            <span>⇄</span>
+            <div><strong>{otherName}</strong><span>{countryName(otherCountry)} · {otherLanguage.toUpperCase()}</span></div>
+          </div>
           <button className={running ? 'danger' : 'primary'} onClick={running ? stop : start}>{running ? 'Stop interpreter' : 'Start interpreter'}</button>
         </div>
+
         <div className="transcript-card">
-          <div className="eyebrow">LIVE TRANSCRIPT</div>
-          {turns.length === 0 ? <p className="empty-caption">Conversation will appear here.</p> : turns.map((turn) => <div className="turn" key={turn.id}><span>{turn.participantName}</span><p>{turn.sourceText}</p><strong>{turn.translatedText}</strong></div>)}
+          <div className="transcript-card-head">
+            <div className="eyebrow">LIVE TRANSCRIPT</div>
+            {turns.length > 0 && (
+              <button className="ghost small" onClick={() => downloadTranscript(turns, 'face-to-face')}>
+                Download
+              </button>
+            )}
+          </div>
+          {turns.length === 0 ? <p className="empty-caption">Conversation will appear here.</p> : turns.map((turn) => (
+            <div className="turn" key={turn.id}>
+              <span>{turn.participantName}</span>
+              <p>{turn.sourceText}</p>
+              <strong>{turn.translatedText}</strong>
+            </div>
+          ))}
         </div>
       </section>
     </main>
