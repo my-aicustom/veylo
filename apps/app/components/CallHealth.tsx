@@ -24,6 +24,7 @@ export function CallHealth({ room }: { room: Room }) {
   );
   const [reconnecting, setReconnecting] = React.useState(false);
   const [canPlayAudio, setCanPlayAudio] = React.useState(room.canPlaybackAudio);
+  const [online, setOnline] = React.useState(true);
 
   React.useEffect(() => {
     const onQuality = (next: ConnectionQuality, participant: { identity: string }) => {
@@ -32,11 +33,17 @@ export function CallHealth({ room }: { room: Room }) {
     const onReconnecting = () => setReconnecting(true);
     const onReconnected = () => setReconnecting(false);
     const onAudio = () => setCanPlayAudio(room.canPlaybackAudio);
+    const onOnline = () => setOnline(true);
+    const onOffline = () => setOnline(false);
 
     room.on(RoomEvent.ConnectionQualityChanged, onQuality as any);
     room.on(RoomEvent.Reconnecting, onReconnecting);
     room.on(RoomEvent.Reconnected, onReconnected);
     room.on(RoomEvent.AudioPlaybackStatusChanged, onAudio);
+
+    if (typeof navigator !== 'undefined') setOnline(navigator.onLine);
+    window.addEventListener('online', onOnline);
+    window.addEventListener('offline', onOffline);
 
     setQuality(room.localParticipant.connectionQuality || ConnectionQuality.Unknown);
     setCanPlayAudio(room.canPlaybackAudio);
@@ -46,6 +53,8 @@ export function CallHealth({ room }: { room: Room }) {
       room.off(RoomEvent.Reconnecting, onReconnecting);
       room.off(RoomEvent.Reconnected, onReconnected);
       room.off(RoomEvent.AudioPlaybackStatusChanged, onAudio);
+      window.removeEventListener('online', onOnline);
+      window.removeEventListener('offline', onOffline);
     };
   }, [room]);
 
@@ -66,8 +75,8 @@ export function CallHealth({ room }: { room: Room }) {
     );
   }
 
-  const label = reconnecting ? 'Reconnecting…' : qualityLabel(quality);
-  const state = reconnecting || quality === ConnectionQuality.Lost
+  const label = !online ? 'Offline' : reconnecting ? 'Reconnecting…' : qualityLabel(quality);
+  const state = !online || reconnecting || quality === ConnectionQuality.Lost
     ? 'danger'
     : quality === ConnectionQuality.Poor
       ? 'attention'
@@ -75,13 +84,14 @@ export function CallHealth({ room }: { room: Room }) {
         ? 'good'
         : 'neutral';
 
+  const title = !online
+    ? 'This device is offline. Veylo will recover the call when network access returns.'
+    : reconnecting
+      ? 'Veylo is restoring the realtime connection.'
+      : `Connection quality: ${label}`;
+
   return (
-    <span
-      className="call-health"
-      data-state={state}
-      aria-live="polite"
-      title={reconnecting ? 'Veylo is restoring the realtime connection.' : `Connection quality: ${label}`}
-    >
+    <span className="call-health" data-state={state} aria-live="polite" title={title}>
       <span className="health-dot" aria-hidden="true" />
       {label}
     </span>
