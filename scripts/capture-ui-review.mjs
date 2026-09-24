@@ -25,7 +25,7 @@ const browser = spawn(chrome, [
   '--no-default-browser-check',
   '--disable-background-networking',
   '--remote-allow-origins=*',
-  `--remote-debugging-port=${port}`,
+  '--remote-debugging-port=0',
   `--user-data-dir=${userData}`,
   'about:blank',
 ], { stdio: 'ignore' });
