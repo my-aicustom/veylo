@@ -6,6 +6,7 @@ const read = (file) => fs.readFileSync(path.join(root, file), 'utf8');
 const appCss = read('apps/app/styles/globals.css');
 const callCss = read('apps/app/styles/call-ux.css');
 const site = read('apps/site/src/pages/index.astro');
+const logo = read('apps/site/src/components/Logo.astro');
 const design = read('docs/DESIGN_SYSTEM.md');
 
 const results = [];
@@ -16,6 +17,10 @@ function check(name, condition, detail = '') {
 // Accessibility / interaction quality.
 check('App has a global :focus-visible treatment', appCss.includes(':focus-visible'));
 check('Public site has a :focus-visible treatment', site.includes(':focus-visible'));
+check('Secondary app text token clears the prior low-contrast value', appCss.includes('--soft: #777d83;'));
+check('Mobile public CTA keeps a 44px square hit area', site.includes('min-width:44px;min-height:44px'));
+check('Public logo does not stretch across the mobile grid cell', logo.includes('justify-self:start'));
+check('App provides an explicit favicon', fs.existsSync(path.join(root, 'apps/app/app/icon.svg')));
 check('Compact app buttons keep the 44px product touch-target rule', /\.small\s*\{[^}]*min-height:\s*44px/s.test(appCss));
 check('Text actions keep the 44px product touch-target rule', /\.text-button\s*\{[^}]*min-height:\s*44px/s.test(appCss));
 check('Reduced-motion support exists in public site', site.includes('prefers-reduced-motion'));
