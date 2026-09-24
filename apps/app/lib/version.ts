@@ -1,1 +1,1 @@
-export const VEYLO_VERSION = '0.5.1';
+export const VEYLO_VERSION = '1.0.0';
