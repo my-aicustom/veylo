@@ -87,8 +87,12 @@ For defense in depth, also configure OpenRouter-side budget/key/workspace guardr
 3. Deploy LiveKit with trusted WSS, public IP advertisement, and TURN/TLS.
 4. Deploy Astro + Next.js behind HTTPS.
 5. Check `/app/api/ready`; do not route production traffic while it returns 503.
-6. Open `/app/diagnostics` and run full diagnostics.
-7. Complete `docs/ACCEPTANCE.md` on real devices and at least two networks.
+6. Run the remote deployment gate from a separate machine:
+   ```bash
+   pnpm acceptance:prod -- --url https://veylo.example.com --deep
+   ```
+7. Open `/app/diagnostics` and run full diagnostics.
+8. Complete `docs/ACCEPTANCE.md` on real devices and at least two networks.
 
 ## Health endpoints
 
