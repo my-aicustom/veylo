@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { tts } from '@/lib/ai/openrouter';
+import { guardAiBudget } from '@/lib/ai-budget';
 import { cleanText, guardApi } from '@/lib/api-guard';
 
 export async function POST(request: NextRequest) {
@@ -10,6 +11,9 @@ export async function POST(request: NextRequest) {
     const body = await request.json();
     const text = cleanText(body.text, 6_000);
     if (!text) return NextResponse.json({ error: 'text is required' }, { status: 400 });
+
+    const budgetBlocked = guardAiBudget();
+    if (budgetBlocked) return budgetBlocked;
 
     const response = await tts(text);
     if (!response.body) {
