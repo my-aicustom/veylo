@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { guardApi } from '@/lib/api-guard';
+import { aiBudgetSnapshot } from '@/lib/ai-budget';
+import { inviteProtectionEnabled } from '@/lib/invite-token';
 import { VEYLO_VERSION } from '@/lib/version';
 
 function configured(value?: string) {
@@ -102,9 +104,12 @@ export async function GET(request: NextRequest) {
       livekitApiSecret: configured(process.env.LIVEKIT_API_SECRET),
       livekitUrl: configured(livekitUrl),
       livekitSecure: /^wss:/i.test(livekitUrl),
+      inviteProtection: inviteProtectionEnabled(),
+      strictProduction: process.env.VEYLO_STRICT_PRODUCTION === 'true',
       appUrl: process.env.APP_URL || null,
       basePath: process.env.NEXT_PUBLIC_BASE_PATH || '/app',
     },
+    aiBudget: aiBudgetSnapshot(),
   };
 
   if (!deep) {
