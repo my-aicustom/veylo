@@ -4,8 +4,8 @@ import { validateProductionEnv, validateRepository } from './readiness-lib.mjs';
 
 function parseEnv(text) {
   const env = {};
-  for (const raw of text.split(/?
-/)) {
+  const normalized = text.replaceAll('\r\n', '\n');
+  for (const raw of normalized.split('\n')) {
     const line = raw.trim();
     if (!line || line.startsWith('#')) continue;
     const index = line.indexOf('=');
