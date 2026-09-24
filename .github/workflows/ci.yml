@@ -31,19 +31,33 @@ jobs:
       - run: pnpm build
       - run: pnpm smoke:runtime
 
-      - name: Package tracked source
+      - name: Package verified release source
         if: github.event_name == 'push' && github.ref == 'refs/heads/main'
         run: |
           VERSION=$(node -p "require('./package.json').version")
           SOURCE_ARCHIVE="Veylo-v${VERSION}-source.zip"
+          BUILD_INFO="Veylo-v${VERSION}-BUILD_INFO.txt"
           git archive --format=zip --output="${SOURCE_ARCHIVE}" HEAD
+          sha256sum "${SOURCE_ARCHIVE}" > "${SOURCE_ARCHIVE}.sha256"
+          {
+            echo "Veylo verified source release"
+            echo "version=${VERSION}"
+            echo "commit=${GITHUB_SHA}"
+            echo "workflow_run=${GITHUB_RUN_ID}"
+            echo "built_at=$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+            echo "gates=static-audit,tests,readiness,compose,typecheck,build,runtime-smoke"
+          } > "${BUILD_INFO}"
           echo "SOURCE_ARCHIVE=${SOURCE_ARCHIVE}" >> "$GITHUB_ENV"
+          echo "BUILD_INFO=${BUILD_INFO}" >> "$GITHUB_ENV"
 
-      - name: Upload source archive
+      - name: Upload verified release artifact
         if: github.event_name == 'push' && github.ref == 'refs/heads/main'
         uses: actions/upload-artifact@v4
         with:
-          name: veylo-source-${{ github.sha }}
-          path: ${{ env.SOURCE_ARCHIVE }}
+          name: veylo-v1.0.0-${{ github.sha }}
+          path: |
+            ${{ env.SOURCE_ARCHIVE }}
+            ${{ env.SOURCE_ARCHIVE }}.sha256
+            ${{ env.BUILD_INFO }}
           if-no-files-found: error
-          retention-days: 14
+          retention-days: 30
