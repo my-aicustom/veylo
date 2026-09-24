@@ -38,11 +38,17 @@ export function RoomPageClient({ roomName }: { roomName: string }) {
     if (!profile) return;
     setError('');
     setChoices(values);
+
+    const inviteToken = typeof window !== 'undefined'
+      ? new URL(window.location.href).searchParams.get('invite')
+      : null;
+
     const response = await fetch(apiUrl('/api/connection-details'), {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         roomName,
+        inviteToken,
         participantName: values.username || profile.name,
         countryCode: profile.countryCode,
         countryName: profile.countryName,
