@@ -51,6 +51,7 @@ pnpm readiness:template
 pnpm typecheck
 pnpm build
 pnpm smoke:runtime
+pnpm acceptance:prod -- --help
 ```
 
 For a real production environment:
@@ -62,6 +63,14 @@ pnpm readiness -- --env .env.production
 ```
 
 The production preflight requires HTTPS, WSS, non-placeholder secrets, signed invites, strict production mode, and positive AI request/cost caps.
+
+After deployment, verify the live environment from any machine with Node.js 20+:
+
+```bash
+pnpm acceptance:prod -- --url https://veylo.example.com --deep
+```
+
+The remote runner verifies public HTTPS reachability, app readiness, security headers, strict-production flags, signed/tampered/valid invite behavior, LiveKit token issuance, and (with `--deep`) OpenRouter + LiveKit reachability. It does not send conversation content or invoke paid AI inference.
 
 ## Runtime endpoints
 
