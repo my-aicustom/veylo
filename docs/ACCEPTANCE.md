@@ -31,6 +31,18 @@ A `main` release artifact is produced only after this gate.
 - [ ] OpenRouter provider-side spend controls are configured to your preferred limit
 - [ ] DNS/cert renewal is operational
 
+### Automated remote deployment gate
+
+After deploying the real environment, run:
+
+```bash
+pnpm acceptance:prod -- --url https://veylo.example.com --deep
+```
+
+This automatically verifies the deployable subset of sections B/C: HTTPS/TLS reachability, application page, security headers, `/app/api/ready`, strict-production/runtime flags, signed invite creation, unsigned/tampered invite rejection, valid LiveKit token issuance, WSS configuration, diagnostics reachability, and optional OpenRouter/LiveKit deep reachability.
+
+A green remote run can be used as evidence for the corresponding machine-verifiable checks, but it does **not** replace device/media/network acceptance such as microphone permissions, Bluetooth routing, TURN behavior on restrictive Wi-Fi, real STT/translation/TTS quality, or conversational latency.
+
 ## C. Live Call
 
 - [ ] create room returns a signed invite URL
