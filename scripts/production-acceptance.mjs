@@ -45,7 +45,7 @@ function parseArgs(argv) {
 function normalizeBasePath(value) {
   const clean = String(value || '/app').trim();
   if (!clean || clean === '/') return '';
-  return `/${clean.replace(/^\\/+|\\/+$/g, '')}`;
+  return `/${clean.replace(/^\/+|\/+$/g, '')}`;
 }
 
 function joinUrl(origin, path) {
