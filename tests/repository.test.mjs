@@ -83,11 +83,27 @@ test('runtime readiness and smoke test exist', () => {
   assert.ok(read('scripts/runtime-smoke.mjs').includes('RUNTIME SMOKE PASSED'));
 });
 
-test('reverse proxy includes baseline browser security headers', () => {
+test('app and reverse proxy enforce the production security-header baseline', () => {
   const nginx = read('deploy/nginx.conf');
-  for (const header of ['X-Content-Type-Options', 'X-Frame-Options', 'Referrer-Policy', 'Permissions-Policy']) {
-    assert.ok(nginx.includes(header), header);
+  const nextConfig = read('apps/app/next.config.mjs');
+  const tlsTemplate = read('deploy/production/nginx-tls.conf.example');
+
+  for (const header of [
+    'Content-Security-Policy',
+    'Strict-Transport-Security',
+    'X-Content-Type-Options',
+    'X-Frame-Options',
+    'Referrer-Policy',
+    'Permissions-Policy',
+  ]) {
+    assert.ok(nginx.includes(header), `nginx: ${header}`);
+    assert.ok(nextConfig.includes(header), `next: ${header}`);
+    assert.ok(tlsTemplate.includes(header), `tls template: ${header}`);
   }
+
+  assert.ok(nginx.includes('server_tokens off'));
+  assert.ok(nextConfig.includes('poweredByHeader: false'));
+  assert.ok(nginx.includes('X-Frame-Options "DENY"'));
 });
 
 test('public homepage still exposes all three conversation modes', () => {
