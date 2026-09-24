@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { AccessToken, type VideoGrant } from 'livekit-server-sdk';
 import type { ConnectionDetails } from '@/lib/types';
 import { cleanText, guardApi } from '@/lib/api-guard';
+import { inviteProtectionEnabled, verifyInviteToken } from '@/lib/invite-token';
 
 const LIVEKIT_URL = process.env.LIVEKIT_URL;
 const API_KEY = process.env.LIVEKIT_API_KEY;
@@ -28,6 +29,17 @@ export async function POST(request: NextRequest) {
         { error: 'Invalid room name. Use 3-80 letters, numbers, dashes, or underscores.' },
         { status: 400 },
       );
+    }
+
+    if (inviteProtectionEnabled()) {
+      const invite = verifyInviteToken(roomName, body.inviteToken);
+      if (!invite.valid) {
+        const message =
+          invite.reason === 'expired'
+            ? 'This invite link has expired. Ask the room creator for a new link.'
+            : 'A valid Veylo invite link is required for this room.';
+        return NextResponse.json({ error: message }, { status: 403 });
+      }
     }
 
     const countryCode = cleanText(body.countryCode, 3).toUpperCase();
