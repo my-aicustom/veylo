@@ -1,0 +1,29 @@
+# Production template — replace example domains and credentials before use.
+# Prefer generating the final VM deployment with LiveKit's official generator.
+
+port: 7880
+log_level: info
+
+rtc:
+  tcp_port: 7881
+  port_range_start: 50000
+  port_range_end: 60000
+  use_external_ip: true
+
+# Optional but recommended when you add a shared Redis instance.
+# redis:
+#   address: 127.0.0.1:6379
+
+# Prometheus metrics for operational monitoring.
+prometheus_port: 6789
+
+turn:
+  enabled: true
+  domain: turn.example.com
+  # When there is no L4 load balancer, advertise TURN/TLS on 443.
+  tls_port: 443
+  cert_file: /etc/livekit/certs/fullchain.pem
+  key_file: /etc/livekit/certs/privkey.pem
+
+keys:
+  CHANGE_ME_API_KEY: CHANGE_ME_API_SECRET

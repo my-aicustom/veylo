@@ -1,37 +1,40 @@
-# VEYLO — v0.4.7
+# VEYLO — v0.5.0
 
 > Working codename. Internal multilingual communication product by MY-AI.
 
-Veylo combines a fast Astro marketing homepage with a self-hosted LiveKit realtime application and server-side OpenRouter inference.
+Veylo combines an Astro marketing homepage, a Next.js realtime application, self-hosted LiveKit communication, and server-side OpenRouter inference.
 
 ## Product modes
 
-- **Live Call** — create/join a Veylo video room with listener-side interpretation.
-- **Face-to-Face** — one device acts as interpreter between two people in the same room.
-- **AI Simulation** — practice with an AI counterpart using country, role and scenario context.
-- **Diagnostics** — test browser media, WebRTC, server config, LiveKit reachability, OpenRouter model availability, and local latency traces.
+- **Live Call** — private video rooms with listener-side AI interpretation.
+- **Face-to-Face** — one-device interpretation for two people in the same room.
+- **AI Simulation** — practice international conversations with an AI counterpart.
+- **Diagnostics** — browser/media, LiveKit, OpenRouter, deployment and latency troubleshooting.
 
-## v0.4.7 latency telemetry
+## v0.5.0 production + QA foundation
 
-- measures each Live Call interpretation turn using the browser's monotonic high-resolution clock
-- captures queue delay after phrase capture, STT duration, translation duration, speech queue delay, TTS response time, first streamed chunk, playback start, total TTS duration, and end-to-end time to translated playback
-- shows compact E2E / STT / translation / TTS-start values directly in the Interpreter panel
-- keeps up to 60 recent latency traces in browser localStorage only
-- Diagnostics shows the latest trace, median E2E, median STT, median translation, median TTS-start, and the last eight turns
-- same-language turns are recorded without inventing translation/TTS durations
-- local timing storage is best-effort and never blocks an active call
+- LiveKit Server is pinned to `v1.13.7`; the dev stack no longer follows `:latest`
+- centralized Veylo version used by the health endpoint
+- root/app/site versions synchronized
+- Node-native automated test suite added without adding another test framework dependency
+- CI now gates on tests, production-template readiness, Docker Compose validation, typecheck and production build
+- production preflight rejects insecure URLs, localhost endpoints and development/placeholder credentials
+- production LiveKit template includes public-IP advertisement and TURN/TLS requirements
+- room names are validated before LiveKit token creation
+- reverse proxy adds baseline content/frame/referrer/permissions security headers
+- explicit internal-beta acceptance checklist added
+- production deployment assets and security boundary documented
 
-Telemetry is intentionally local-only in this version. No conversation timing data is uploaded to a separate analytics service.
+## Existing realtime capabilities
 
-## v0.4.6 lower-latency TTS transport
-
-- TTS audio is streamed through the Next.js gateway instead of being fully buffered on the server first
-- supported browsers use MediaSource progressive playback for `audio/mpeg`
-- playback can start after the first valid audio chunks instead of waiting for the complete MP3 response
-- browsers without MediaSource support keep the previous full-blob playback path
-- the same playback engine is used by Live Call, Face-to-Face, and AI Simulation
-- upstream generation IDs are forwarded when OpenRouter provides them
-- the gateway marks TTS responses with `X-Veylo-TTS-Transport: stream`
+- self-hosted LiveKit room/token flow
+- OpenRouter STT, translation, AI simulation/mediation and TTS
+- streaming TTS with progressive playback where supported
+- listener-language correction during a live call
+- transcript persistence/export
+- network/reconnect/audio-playback health
+- local end-to-end latency telemetry and historical diagnostics
+- no user login requirement
 
 ## Local development
 
@@ -44,21 +47,9 @@ pnpm dev
 - Astro site: http://localhost:4321
 - Veylo app: http://localhost:3000/app
 - Diagnostics: http://localhost:3000/app/diagnostics
-- LiveKit: ws://localhost:7880 when started separately or through Docker Compose
+- Local LiveKit: ws://localhost:7880
 
-To run LiveKit locally:
-
-```bash
-docker compose up livekit -d
-```
-
-The Astro site uses `PUBLIC_APP_URL`. For local development you can set:
-
-```bash
-PUBLIC_APP_URL=http://localhost:3000/app
-```
-
-## Full local container stack
+Full local stack:
 
 ```bash
 cp .env.example .env
@@ -66,20 +57,36 @@ cp .env.example .env
 docker compose up --build
 ```
 
-Then open http://localhost:8080.
+Open http://localhost:8080.
 
-The root Docker Compose file is for local/internal development. **Do not publish it unchanged to the internet.** Read `docs/DEPLOYMENT.md` before VPS deployment; production LiveKit needs a public `wss://` endpoint, trusted TLS, public-IP advertisement and TURN coverage for restrictive networks.
+## Automated verification
+
+```bash
+pnpm audit:static
+pnpm test
+pnpm readiness:template
+pnpm typecheck
+pnpm build
+```
+
+For a real production environment:
+
+```bash
+cp deploy/production/env.production.example .env.production
+# replace placeholders
+pnpm readiness -- --env .env.production
+```
+
+Then follow `docs/DEPLOYMENT.md` and complete `docs/ACCEPTANCE.md`.
 
 ## Security boundary
 
-`OPENROUTER_API_KEY`, `LIVEKIT_API_SECRET`, and future server credentials must never be shipped into browser code. OpenRouter calls live only in Next.js server routes.
-
-Veylo intentionally has no user login. Current API guards are suitable for a single-instance internal deployment; if it becomes broadly public or horizontally scaled, move rate limiting to shared state and add an outer access/session layer.
+`OPENROUTER_API_KEY`, `LIVEKIT_API_SECRET`, and `LIVEKIT_API_KEY` must remain server-side. Veylo intentionally has no user account/login system. See `SECURITY.md` for the current internal-app threat boundary.
 
 ## Foundation
 
-The call application is derived from patterns and dependencies in the official LiveKit Meet project and uses self-hosted LiveKit Server. See `UPSTREAM.md`, `THIRD_PARTY_NOTICES.md`, and `LICENSE`.
+The call application uses patterns/dependencies from the official LiveKit ecosystem and self-hosted LiveKit Server. See `UPSTREAM.md`, `THIRD_PARTY_NOTICES.md`, and `LICENSE`.
 
-## Before public branding
+## Branding
 
-Read `BRAND_STATUS.md`. "Veylo" is currently a working codename and is **not cleared as a public trademark/product name**.
+Read `BRAND_STATUS.md`. "Veylo" remains a working codename and is not yet cleared as a public trademark/product name.

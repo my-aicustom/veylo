@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { guardApi } from '@/lib/api-guard';
+import { VEYLO_VERSION } from '@/lib/version';
 
 function configured(value?: string) {
   return Boolean(value && value.trim());
@@ -93,7 +94,7 @@ export async function GET(request: NextRequest) {
   const livekitUrl = publicLiveKitUrl();
   const base = {
     app: 'Veylo',
-    version: '0.4.5',
+    version: VEYLO_VERSION,
     serverTime: new Date().toISOString(),
     config: {
       openrouterKey: configured(process.env.OPENROUTER_API_KEY),
