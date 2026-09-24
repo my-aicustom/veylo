@@ -13,6 +13,11 @@ function devLike(value) {
   return DEV_VALUES.has(normalized) || normalized.includes('change_me') || normalized.includes('change-me') || normalized.includes('replace_me') || normalized.includes('replace-me');
 }
 
+function positive(value) {
+  const number = Number(value);
+  return Number.isFinite(number) && number > 0;
+}
+
 function parseUrl(value) {
   try {
     return new URL(value);
@@ -28,6 +33,10 @@ function isLocalHost(url) {
 
 export function validateProductionEnv(env) {
   const errors = [];
+
+  if (env.VEYLO_STRICT_PRODUCTION !== 'true') {
+    errors.push('VEYLO_STRICT_PRODUCTION must be true in production.');
+  }
 
   if (!present(env.APP_URL)) {
     errors.push('APP_URL is required.');
@@ -59,6 +68,13 @@ export function validateProductionEnv(env) {
   if (!present(env.OPENROUTER_API_KEY)) errors.push('OPENROUTER_API_KEY is required.');
   else if (devLike(env.OPENROUTER_API_KEY)) errors.push('OPENROUTER_API_KEY still uses a placeholder value.');
 
+  if (!positive(env.VEYLO_AI_MAX_REQUESTS_PER_HOUR)) {
+    errors.push('VEYLO_AI_MAX_REQUESTS_PER_HOUR must be a positive number in production.');
+  }
+  if (!positive(env.VEYLO_AI_MAX_TRACKED_COST_USD_PER_DAY)) {
+    errors.push('VEYLO_AI_MAX_TRACKED_COST_USD_PER_DAY must be a positive number in production.');
+  }
+
   return errors;
 }
 
@@ -78,11 +94,15 @@ export function validateRepository(rootDir) {
   const required = [
     'deploy/production/livekit.yaml.example',
     'deploy/production/env.production.example',
+    'deploy/production/nginx-tls.conf.example',
     'docs/DEPLOYMENT.md',
     'apps/app/lib/version.ts',
     'apps/app/lib/invite-token.ts',
+    'apps/app/lib/ai-budget.ts',
     'apps/app/app/api/invite/route.ts',
     'apps/app/app/api/health/route.ts',
+    'apps/app/app/api/ready/route.ts',
+    'scripts/runtime-smoke.mjs',
   ];
   for (const relative of required) {
     if (!exists(relative)) errors.push(`Missing required production file: ${relative}`);
@@ -96,9 +116,19 @@ export function validateRepository(rootDir) {
   }
 
   const ci = read('.github/workflows/ci.yml');
-  for (const check of ['pnpm test', 'pnpm readiness:template', 'docker compose config', 'pnpm typecheck', 'pnpm build']) {
+  for (const check of ['pnpm test', 'pnpm readiness:template', 'docker compose config', 'pnpm typecheck', 'pnpm build', 'pnpm smoke:runtime']) {
     if (!ci.includes(check)) errors.push(`CI is missing required gate: ${check}`);
   }
+
+  const nextConfig = read('apps/app/next.config.mjs');
+  for (const header of ['Content-Security-Policy', 'Strict-Transport-Security', 'X-Content-Type-Options', 'X-Frame-Options']) {
+    if (!nextConfig.includes(header)) errors.push(`Next.js is missing required security header: ${header}`);
+  }
+  if (!nextConfig.includes('poweredByHeader: false')) errors.push('Next.js must disable the X-Powered-By header.');
+
+  const nginx = read('deploy/nginx.conf');
+  if (!nginx.includes('server_tokens off')) errors.push('Nginx must disable server tokens.');
+  if (!nginx.includes('Content-Security-Policy')) errors.push('Nginx must set Content-Security-Policy.');
 
   const health = read('apps/app/app/api/health/route.ts');
   if (!health.includes('VEYLO_VERSION')) errors.push('Health endpoint must use the centralized VEYLO_VERSION constant.');

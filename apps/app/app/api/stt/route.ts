@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { stt } from '@/lib/ai/openrouter';
+import { guardAiBudget, recordAiUsage } from '@/lib/ai-budget';
 import { cleanText, estimatedBase64Bytes, guardApi } from '@/lib/api-guard';
 
 const ALLOWED_FORMATS = new Set(['wav', 'mp3', 'flac', 'm4a', 'ogg', 'webm', 'aac']);
@@ -23,8 +24,12 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Unsupported audio format.' }, { status: 400 });
     }
 
+    const budgetBlocked = guardAiBudget();
+    if (budgetBlocked) return budgetBlocked;
+
     const language = cleanText(body.language, 12) || undefined;
     const result = await stt(body.audioBase64, format, language);
+    recordAiUsage(result);
     return NextResponse.json(result, { headers: { 'Cache-Control': 'no-store' } });
   } catch (error) {
     return NextResponse.json({ error: error instanceof Error ? error.message : 'STT failed' }, { status: 502 });

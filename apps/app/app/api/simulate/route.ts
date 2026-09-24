@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { chat } from '@/lib/ai/openrouter';
 import { simulationSystem } from '@/lib/ai/prompts';
+import { guardAiBudget, recordAiUsage } from '@/lib/ai-budget';
 import { cleanText, guardApi } from '@/lib/api-guard';
 
 export async function POST(request: NextRequest) {
@@ -36,11 +37,16 @@ export async function POST(request: NextRequest) {
       { role: 'user', content: text },
     ];
 
+    const budgetBlocked = guardAiBudget();
+    if (budgetBlocked) return budgetBlocked;
+
     const result: any = await chat(messages, 0.65);
+    recordAiUsage(result);
+
     const reply = result?.choices?.[0]?.message?.content?.trim();
     if (!reply) throw new Error('Simulation model returned empty output');
 
-    return NextResponse.json({ reply }, { headers: { 'Cache-Control': 'no-store' } });
+    return NextResponse.json({ reply, usage: result.usage }, { headers: { 'Cache-Control': 'no-store' } });
   } catch (error) {
     return NextResponse.json({ error: error instanceof Error ? error.message : 'Simulation failed' }, { status: 502 });
   }

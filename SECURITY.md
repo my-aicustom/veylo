@@ -1,46 +1,64 @@
-# Security boundary
+# Security boundary — Veylo v1.0.0
 
-Veylo is currently designed as a small internal application rather than a public anonymous communications service.
+Veylo is designed as a small internal communication application, not a public anonymous multi-tenant service.
 
-## Secrets
-
-These values are server-side only:
+## Server-side secrets
 
 - `OPENROUTER_API_KEY`
 - `LIVEKIT_API_KEY`
 - `LIVEKIT_API_SECRET`
 - `VEYLO_INVITE_SECRET`
 
-Never expose them through browser bundles, public repository files, screenshots, or `NEXT_PUBLIC_*` variables.
+Never expose these through browser bundles, screenshots, repository files, `NEXT_PUBLIC_*`, or client logging.
 
-## Signed room invites
+## Room authorization
 
-When `VEYLO_INVITE_SECRET` is configured, Veylo generates time-limited HMAC-signed room links. The room name and expiry are covered by the signature, and the server uses constant-time signature comparison before issuing a LiveKit participant token.
+When `VEYLO_INVITE_SECRET` is configured, room creation issues a time-limited HMAC-SHA256 signed invite. The room name and expiry are signed. A missing, expired, malformed, tampered, or room-mismatched invite is rejected before a LiveKit participant token is issued.
 
-The invite layer deliberately does not introduce user accounts:
+Production preflight requires an invite secret of at least 32 characters.
 
-- room creator requests an invite from the same-origin Veylo app
-- the shared URL carries the time-limited invite token
-- joining the room requires that token when production invite protection is enabled
-- local development can leave `VEYLO_INVITE_SECRET` blank
+## API controls
 
-Signed invites reduce casual room guessing/reuse. They are not a substitute for organization authentication if Veylo later becomes a public multi-tenant service.
-
-## Current controls
-
-- same-origin checks on application API routes
-- per-IP rate limiting for the single-instance app deployment
-- payload and text-size limits
-- validated room-name format before LiveKit token creation
-- signed/time-limited room invites in production
+- same-origin request checks
+- per-IP endpoint rate limits
+- payload/text size limits
+- room-name validation
 - short-lived LiveKit participant tokens
 - no-store responses for sensitive runtime endpoints
-- baseline browser security headers at the development reverse proxy
-- production preflight validation
-- local-only transcripts/latency traces unless the user explicitly exports them
+- global AI request cap
+- daily tracked-cost cap for provider responses exposing `usage.cost`
 
-## Deployment assumptions
+The in-process guards are a backstop for the intended single-instance internal deployment. Horizontal scaling requires shared state.
 
-The current in-memory rate limiter assumes one application instance. If the app is horizontally scaled or broadly exposed to the internet, use shared rate-limit state and an outer access/session layer.
+## Provider observability
 
-LiveKit development credentials and local `ws://` configuration are not production-safe. Follow `docs/DEPLOYMENT.md`.
+OpenRouter calls emit structured server logs containing operational fields such as request ID, API path, attempt, status, latency, and generation ID when present. Veylo does not intentionally log prompt/message/audio bodies in these provider log events.
+
+## Browser/edge headers
+
+The app and supplied proxy templates enforce:
+
+- Content-Security-Policy
+- Strict-Transport-Security
+- X-Content-Type-Options: nosniff
+- X-Frame-Options: DENY
+- Referrer-Policy
+- Permissions-Policy
+- Cross-Origin-Opener-Policy
+- disabled framework/server version exposure where controlled
+
+Next.js `X-Powered-By` is disabled.
+
+## AI spend defense in depth
+
+Production requires local Veylo AI caps. For additional provider-side enforcement, configure OpenRouter key/workspace budget controls and model/provider restrictions separately. Provider-side guardrails are authoritative even if an application process restarts.
+
+## Production boundary
+
+- use trusted HTTPS for the web app
+- use browser-reachable trusted `wss://` for LiveKit
+- enable public-IP advertisement and TURN/TLS for production RTC
+- never use local LiveKit dev credentials in production
+- keep app, RTC, and secrets separated between development/staging/production where practical
+
+If Veylo becomes broadly public or multi-tenant, add an organization access layer and shared rate-limit/budget storage.

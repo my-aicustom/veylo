@@ -12,6 +12,7 @@ test('all runtime API routes exist', () => {
     'apps/app/app/api/health/route.ts',
     'apps/app/app/api/invite/route.ts',
     'apps/app/app/api/mediate/route.ts',
+    'apps/app/app/api/ready/route.ts',
     'apps/app/app/api/simulate/route.ts',
     'apps/app/app/api/stt/route.ts',
     'apps/app/app/api/translate/route.ts',
@@ -39,7 +40,7 @@ test('workspace, app, site, and health version stay synchronized', () => {
   const sitePackage = JSON.parse(read('apps/site/package.json'));
   const versionSource = read('apps/app/lib/version.ts');
 
-  assert.equal(rootPackage.version, '0.5.1');
+  assert.equal(rootPackage.version, '1.0.0');
   assert.equal(appPackage.version, rootPackage.version);
   assert.equal(sitePackage.version, rootPackage.version);
   assert.ok(versionSource.includes(`'${rootPackage.version}'`));
@@ -65,10 +66,49 @@ test('room access has both validation and signed-invite enforcement', () => {
   assert.ok(inviteLib.includes('timingSafeEqual'));
 });
 
-test('reverse proxy includes baseline browser security headers', () => {
+test('AI routes use the global request budget guard', () => {
+  for (const file of [
+    'apps/app/app/api/stt/route.ts',
+    'apps/app/app/api/translate/route.ts',
+    'apps/app/app/api/tts/route.ts',
+    'apps/app/app/api/simulate/route.ts',
+    'apps/app/app/api/mediate/route.ts',
+  ]) {
+    assert.ok(read(file).includes('guardAiBudget'), file);
+  }
+});
+
+test('runtime readiness and smoke test exist', () => {
+  assert.ok(read('apps/app/app/api/ready/route.ts').includes('ready'));
+  assert.ok(read('scripts/runtime-smoke.mjs').includes('RUNTIME SMOKE PASSED'));
+});
+
+test('app and reverse proxy enforce the production security-header baseline', () => {
   const nginx = read('deploy/nginx.conf');
-  for (const header of ['X-Content-Type-Options', 'X-Frame-Options', 'Referrer-Policy', 'Permissions-Policy']) {
-    assert.ok(nginx.includes(header), header);
+  const nextConfig = read('apps/app/next.config.mjs');
+  const tlsTemplate = read('deploy/production/nginx-tls.conf.example');
+
+  for (const header of [
+    'Content-Security-Policy',
+    'Strict-Transport-Security',
+    'X-Content-Type-Options',
+    'X-Frame-Options',
+    'Referrer-Policy',
+    'Permissions-Policy',
+  ]) {
+    assert.ok(nginx.includes(header), `nginx: ${header}`);
+    assert.ok(nextConfig.includes(header), `next: ${header}`);
+    assert.ok(tlsTemplate.includes(header), `tls template: ${header}`);
+  }
+
+  assert.ok(nginx.includes('server_tokens off'));
+  assert.ok(nextConfig.includes('poweredByHeader: false'));
+  assert.ok(nginx.includes('X-Frame-Options "DENY"'));
+});
+
+test('release handoff documents exist', () => {
+  for (const file of ['RELEASE_STATUS.md', 'docs/LOCAL_TEST.md', 'docs/ACCEPTANCE.md', 'docs/DEPLOYMENT.md']) {
+    assert.ok(fs.existsSync(path.join(root, file)), file);
   }
 });
 
