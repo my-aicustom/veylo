@@ -8,11 +8,23 @@ function key() {
 
 const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
+function providerLog(event: string, details: Record<string, unknown>) {
+  console.info(JSON.stringify({
+    ts: new Date().toISOString(),
+    component: 'openrouter',
+    event,
+    ...details,
+  }));
+}
+
 async function request(path: string, body: unknown, raw = false) {
   let last = 'OpenRouter request failed';
+  const requestId = crypto.randomUUID();
 
   for (let attempt = 0; attempt < 3; attempt += 1) {
+    const startedAt = Date.now();
     let response: Response;
+
     try {
       response = await fetch(BASE + path, {
         method: 'POST',
@@ -27,6 +39,13 @@ async function request(path: string, body: unknown, raw = false) {
       });
     } catch (error) {
       last = error instanceof Error ? error.message : String(error);
+      providerLog('network_error', {
+        requestId,
+        path,
+        attempt: attempt + 1,
+        latencyMs: Date.now() - startedAt,
+        error: last,
+      });
       if (attempt < 2) {
         await sleep(300 * (attempt + 1));
         continue;
@@ -34,10 +53,35 @@ async function request(path: string, body: unknown, raw = false) {
       throw new Error(last);
     }
 
-    if (response.ok) return raw ? response : response.json();
+    const generationId = response.headers.get('x-generation-id');
+    const latencyMs = Date.now() - startedAt;
 
-    last = `OpenRouter ${response.status}: ${(await response.text()).slice(0, 600)}`;
+    if (response.ok) {
+      providerLog('success', {
+        requestId,
+        path,
+        attempt: attempt + 1,
+        status: response.status,
+        latencyMs,
+        generationId: generationId || undefined,
+      });
+      return raw ? response : response.json();
+    }
+
+    const responseText = (await response.text()).slice(0, 600);
+    last = `OpenRouter ${response.status}: ${responseText}`;
     const retryable = response.status === 429 || response.status >= 500;
+
+    providerLog('provider_error', {
+      requestId,
+      path,
+      attempt: attempt + 1,
+      status: response.status,
+      latencyMs,
+      retryable,
+      generationId: generationId || undefined,
+    });
+
     if (retryable && attempt < 2) {
       await sleep(400 * (attempt + 1));
       continue;
@@ -81,6 +125,7 @@ export async function chat(messages: unknown[], temperature = 0.1) {
     temperature,
     reasoning: { effort: 'minimal', exclude: true },
     max_tokens: 900,
+    usage: { include: true },
     ...(provider ? { provider } : {}),
   });
 }
