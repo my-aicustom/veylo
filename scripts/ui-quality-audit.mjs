@@ -21,6 +21,7 @@ check('Secondary app text token clears the prior low-contrast value', appCss.inc
 check('Mobile public CTA keeps a 44px square hit area', site.includes('min-width:44px;min-height:44px'));
 check('Public logo does not stretch across the mobile grid cell', logo.includes('justify-self:start'));
 check('App provides an explicit favicon', fs.existsSync(path.join(root, 'apps/app/app/icon.svg')));
+check('Screenshot harness uses dynamic Chrome debugging port', read('scripts/capture-ui-review.mjs').includes("'--remote-debugging-port=0'") && !read('scripts/capture-ui-review.mjs').includes('const port = 9222'));
 check('Compact app buttons keep the 44px product touch-target rule', /\.small\s*\{[^}]*min-height:\s*44px/s.test(appCss));
 check('Text actions keep the 44px product touch-target rule', /\.text-button\s*\{[^}]*min-height:\s*44px/s.test(appCss));
 check('Reduced-motion support exists in public site', site.includes('prefers-reduced-motion'));
