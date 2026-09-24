@@ -23,6 +23,7 @@ jobs:
       - run: pnpm audit:static
       - run: pnpm test
       - run: pnpm readiness:template
+      - run: pnpm acceptance:prod -- --help
       - name: Validate Docker Compose
         run: |
           cp .env.example .env
