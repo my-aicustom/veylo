@@ -1,91 +1,76 @@
-# Veylo deployment
+# Veylo v1.0.0 deployment
 
-The root `docker-compose.yml` is a **local/internal development composition**. It intentionally uses local HTTP/WebSocket endpoints and must not be exposed unchanged to the public internet.
+The root `docker-compose.yml` is a local/internal development composition. Do not expose it unchanged to the public internet.
 
-## Recommended production topology
-
-Use separate public endpoints:
+## Recommended topology
 
 - `https://veylo.example.com` — Astro homepage + Next.js Veylo app
 - `wss://rtc.example.com` — LiveKit signalling/WebRTC
-- `turn.example.com` — TURN/TLS endpoint when using a dedicated TURN hostname
+- TURN domain/certificate as required by the LiveKit production topology
 
-For a single production VM, prefer LiveKit's official VM configuration generator instead of hand-building the entire RTC stack:
+Use LiveKit's official production deployment generator or an equivalent reviewed deployment rather than treating the development Compose file as production RTC infrastructure.
 
-```bash
-docker pull livekit/generate
-docker run --rm -it -v$PWD:/output livekit/generate
-```
+## LiveKit production requirements
 
-The generated deployment includes the pieces LiveKit expects for a production VM, including TLS-facing configuration. Veylo's `deploy/production/livekit.yaml.example` is a reviewable baseline/template, not a replacement for environment-specific generation.
+Plan for:
 
-## Network requirements
+- trusted TLS on the LiveKit domain
+- public-IP advertisement
+- TCP 443 for HTTPS/TURN-TLS
+- TCP 7881 for WebRTC/TCP fallback
+- UDP 3478 when TURN/UDP is enabled
+- UDP 50000-60000 for the configured WebRTC media range
+- TURN/TLS for restrictive VPN/corporate/event networks
 
-For the standard LiveKit VM topology, plan firewall/DNS for:
+The repository's `deploy/production/livekit.yaml.example` is a review baseline. The pinned development image is `livekit/livekit-server:v1.13.7`; upgrades should be deliberate and followed by the full Veylo gate.
 
-- TCP 443 — HTTPS and TURN/TLS
-- TCP 80 — certificate issuance/renewal when applicable
-- TCP 7881 — WebRTC over TCP
-- UDP 3478 — TURN/UDP when enabled
-- UDP 50000-60000 — WebRTC media range
+## Web TLS edge
 
-Production LiveKit should advertise its public IP and use a trusted TLS certificate. TURN/TLS materially improves connectivity on restrictive corporate/event networks.
+`deploy/production/nginx-tls.conf.example` provides a hardened example with:
 
-## Version pinning
+- HTTP → HTTPS redirect
+- TLS 1.2/1.3
+- CSP
+- HSTS
+- anti-framing
+- nosniff
+- referrer/permissions policies
+- correct proxy forwarding headers
 
-The development composition pins LiveKit Server to:
-
-```text
-livekit/livekit-server:v1.13.7
-```
-
-Do not silently switch production to `:latest`. Upgrade deliberately, review release notes, then re-run Veylo's acceptance checks.
+Replace example domains and certificate paths.
 
 ## Production environment
-
-Start from:
 
 ```bash
 cp deploy/production/env.production.example .env.production
 ```
 
-Replace every placeholder, then run:
+Replace all placeholders. Then:
 
 ```bash
 pnpm readiness -- --env .env.production
 ```
 
-The preflight rejects:
+Preflight requires:
 
-- `http://` application URLs
-- `ws://` LiveKit URLs
-- localhost production endpoints
-- development/placeholder LiveKit credentials
-- missing OpenRouter credentials
-- missing required production templates/gates
+- `VEYLO_STRICT_PRODUCTION=true`
+- HTTPS `APP_URL`
+- WSS `LIVEKIT_URL`
+- non-placeholder LiveKit credentials
+- strong signed-invite secret
+- OpenRouter key
+- positive hourly AI request cap
+- positive daily tracked-cost cap
 
-Server-side secrets:
+## AI cost controls
 
-- `LIVEKIT_API_KEY`
-- `LIVEKIT_API_SECRET`
-- `OPENROUTER_API_KEY`
+The application provides process-level request and tracked-cost backstops. Choose limits based on the actual expected meeting load.
 
-Never expose them through `NEXT_PUBLIC_*` variables.
+For defense in depth, also configure OpenRouter-side budget/key/workspace guardrails. Application-local counters reset with the process and are not shared across replicas.
 
-## Application deployment
+## Deploy sequence
 
-The application stack consists of:
-
-- Astro public site
-- Next.js Veylo application
-- self-hosted LiveKit
-- OpenRouter for STT, translation, simulation/mediation and TTS
-
-The development Nginx config includes baseline response headers and correct forwarded host/protocol/client-IP headers. Terminate public HTTPS at your production edge/proxy and preserve those forwarding headers to the Next.js app.
-
-## Production validation sequence
-
-1. Run repository CI locally where practical:
+1. Run local/repository gates:
    ```bash
    pnpm install --frozen-lockfile
    pnpm audit:static
@@ -93,23 +78,26 @@ The development Nginx config includes baseline response headers and correct forw
    pnpm readiness:template
    pnpm typecheck
    pnpm build
+   pnpm smoke:runtime
    ```
-2. Validate the real production env:
+2. Validate the real production environment:
    ```bash
    pnpm readiness -- --env .env.production
    ```
-3. Deploy LiveKit with public `wss://`, public-IP advertisement and TURN/TLS.
-4. Deploy the Astro + Next.js application behind HTTPS.
-5. Open `/app/diagnostics` and run full diagnostics.
-6. Complete `docs/ACCEPTANCE.md` on real devices and at least two different networks.
+3. Deploy LiveKit with trusted WSS, public IP advertisement, and TURN/TLS.
+4. Deploy Astro + Next.js behind HTTPS.
+5. Check `/app/api/ready`; do not route production traffic while it returns 503.
+6. Open `/app/diagnostics` and run full diagnostics.
+7. Complete `docs/ACCEPTANCE.md` on real devices and at least two networks.
+
+## Health endpoints
+
+- `/app/api/ready` performs deterministic local configuration checks and returns HTTP 503 when the process should not receive traffic.
+- `/app/api/health` reports local configuration/budget status without secrets.
+- `/app/api/health?deep=1` additionally checks OpenRouter model catalogue and LiveKit reachability.
+
+Do not use the deep endpoint as a high-frequency load-balancer probe because it performs external network requests.
 
 ## Scaling boundary
 
-Veylo intentionally has no user account/login system. Current API guards are designed for a single-instance internal deployment:
-
-- same-origin request checks
-- per-IP in-memory limits
-- request-size limits
-- server-side credentials
-
-If Veylo becomes broadly public or runs multiple application instances, move rate-limit state to shared storage such as Redis and add an outer access/session mechanism.
+Current rate and budget counters are process-local. Before horizontal scaling, move those counters to shared state such as Redis and use a production LiveKit topology appropriate to multiple instances.
