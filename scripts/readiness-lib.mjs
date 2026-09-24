@@ -52,6 +52,10 @@ export function validateProductionEnv(env) {
   else if (devLike(env.LIVEKIT_API_SECRET)) errors.push('LIVEKIT_API_SECRET still uses a development/placeholder value.');
   else if (env.LIVEKIT_API_SECRET.trim().length < 16) errors.push('LIVEKIT_API_SECRET is unexpectedly short for production.');
 
+  if (!present(env.VEYLO_INVITE_SECRET)) errors.push('VEYLO_INVITE_SECRET is required in production.');
+  else if (devLike(env.VEYLO_INVITE_SECRET)) errors.push('VEYLO_INVITE_SECRET still uses a placeholder value.');
+  else if (env.VEYLO_INVITE_SECRET.trim().length < 32) errors.push('VEYLO_INVITE_SECRET must be at least 32 characters.');
+
   if (!present(env.OPENROUTER_API_KEY)) errors.push('OPENROUTER_API_KEY is required.');
   else if (devLike(env.OPENROUTER_API_KEY)) errors.push('OPENROUTER_API_KEY still uses a placeholder value.');
 
@@ -76,6 +80,8 @@ export function validateRepository(rootDir) {
     'deploy/production/env.production.example',
     'docs/DEPLOYMENT.md',
     'apps/app/lib/version.ts',
+    'apps/app/lib/invite-token.ts',
+    'apps/app/app/api/invite/route.ts',
     'apps/app/app/api/health/route.ts',
   ];
   for (const relative of required) {
@@ -96,6 +102,9 @@ export function validateRepository(rootDir) {
 
   const health = read('apps/app/app/api/health/route.ts');
   if (!health.includes('VEYLO_VERSION')) errors.push('Health endpoint must use the centralized VEYLO_VERSION constant.');
+
+  const connection = read('apps/app/app/api/connection-details/route.ts');
+  if (!connection.includes('verifyInviteToken')) errors.push('Connection route must verify signed invite tokens.');
 
   return errors;
 }
