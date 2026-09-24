@@ -15,7 +15,6 @@ const appUrl = arg('--app-url', 'http://127.0.0.1:3100/app');
 if (!chrome) throw new Error('Missing --chrome');
 
 fs.mkdirSync(output, { recursive: true });
-const port = 9222;
 const userData = fs.mkdtempSync(path.join(os.tmpdir(), 'veylo-ui-review-'));
 const browser = spawn(chrome, [
   '--headless=new',
@@ -34,9 +33,17 @@ const browser = spawn(chrome, [
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
 async function getWsUrl() {
-  for (let attempt = 0; attempt < 60; attempt += 1) {
+  const activePortFile = path.join(userData, 'DevToolsActivePort');
+  for (let attempt = 0; attempt < 150; attempt += 1) {
     try {
-      const pages = await fetch(`http://127.0.0.1:${port}/json/list`).then((response) => response.json());
+      if (!fs.existsSync(activePortFile)) {
+        await sleep(100);
+        continue;
+      }
+      const [portLine] = fs.readFileSync(activePortFile, 'utf8').trim().split(/\r?\n/);
+      const debugPort = Number(portLine);
+      if (!Number.isInteger(debugPort) || debugPort <= 0) throw new Error('Invalid Chrome debug port');
+      const pages = await fetch(`http://127.0.0.1:${debugPort}/json/list`).then((response) => response.json());
       const page = pages.find((item) => item.type === 'page');
       if (page?.webSocketDebuggerUrl) return page.webSocketDebuggerUrl;
     } catch {}
