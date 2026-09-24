@@ -11,7 +11,7 @@ import {
 } from 'livekit-client';
 import { PhraseRecorder } from './wav-recorder';
 import { parseParticipantMetadata } from './participant-context';
-import { mediate, speak, transcribe, translate } from './client-ai';
+import { mediate, playSpeech, transcribe, translate } from './client-ai';
 import { clearTranscript, loadTranscript, saveTranscript } from './transcript-persistence';
 import type { Profile, TranscriptTurn } from './types';
 
@@ -52,19 +52,7 @@ export function useRemoteInterpreter(
   }, [sessionId]);
 
   const play = React.useCallback(async (text: string) => {
-    const blob = await speak(text);
-    const url = URL.createObjectURL(blob);
-    const audio = new Audio(url);
-    try {
-      await audio.play();
-      await new Promise<void>((resolve) => {
-        audio.onended = () => resolve();
-        audio.onerror = () => resolve();
-        audio.onpause = () => resolve();
-      });
-    } finally {
-      URL.revokeObjectURL(url);
-    }
+    await playSpeech(text);
   }, []);
 
   const processPhrase = React.useCallback(async (
