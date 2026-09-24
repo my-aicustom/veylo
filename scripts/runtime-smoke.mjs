@@ -90,6 +90,11 @@ try {
     home.status === 200 && (home.headers.get('content-type') || '').includes('text/html'),
     'App homepage failed runtime smoke.',
   );
+  assert(home.headers.get('x-content-type-options') === 'nosniff', 'Runtime nosniff header is missing.');
+  assert(home.headers.get('x-frame-options') === 'DENY', 'Runtime anti-framing header is missing.');
+  assert(Boolean(home.headers.get('content-security-policy')), 'Runtime Content-Security-Policy is missing.');
+  assert(Boolean(home.headers.get('strict-transport-security')), 'Runtime HSTS header is missing.');
+  assert(!home.headers.get('x-powered-by'), 'Runtime must not expose X-Powered-By.');
 
   const diagnostics = await fetch(`${appBase}/app/diagnostics`);
   assert(diagnostics.status === 200, 'Diagnostics page failed runtime smoke.');
