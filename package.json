@@ -24,7 +24,8 @@
     "acceptance:prod": "node scripts/production-acceptance.mjs",
     "capacity:probe": "node scripts/capacity-probe.mjs",
     "infra:check": "node scripts/infrastructure-check.mjs",
-    "infra:check:template": "node scripts/infrastructure-check.mjs --template"
+    "infra:check:template": "node scripts/infrastructure-check.mjs --template",
+    "audit:ui": "node scripts/ui-quality-audit.mjs"
   },
   "devDependencies": {
     "concurrently": "^9.2.1"
