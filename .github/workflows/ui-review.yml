@@ -52,16 +52,15 @@ jobs:
           cat ui-review/site.log || true
           exit 1
 
-      - name: Capture browser evidence
+      - name: Capture hydrated browser evidence
         run: |
           CHROME="$(command -v google-chrome || command -v chromium || command -v chromium-browser)"
           test -n "$CHROME"
-          "$CHROME" --headless --no-sandbox --disable-gpu --hide-scrollbars --window-size=1440,1000 --screenshot=ui-review/site-desktop.png http://127.0.0.1:4321/
-          "$CHROME" --headless --no-sandbox --disable-gpu --hide-scrollbars --window-size=390,844 --screenshot=ui-review/site-mobile.png http://127.0.0.1:4321/
-          "$CHROME" --headless --no-sandbox --disable-gpu --hide-scrollbars --window-size=1440,1000 --screenshot=ui-review/app-onboarding-desktop.png http://127.0.0.1:3100/app
-          "$CHROME" --headless --no-sandbox --disable-gpu --hide-scrollbars --window-size=390,844 --screenshot=ui-review/app-onboarding-mobile.png http://127.0.0.1:3100/app
-          "$CHROME" --headless --no-sandbox --disable-gpu --hide-scrollbars --window-size=1440,1000 --screenshot=ui-review/face-to-face-desktop.png http://127.0.0.1:3100/app/face-to-face
-          "$CHROME" --headless --no-sandbox --disable-gpu --hide-scrollbars --window-size=1440,1000 --screenshot=ui-review/simulation-desktop.png http://127.0.0.1:3100/app/simulation
+          node scripts/capture-ui-review.mjs \
+            --chrome "$CHROME" \
+            --output ui-review \
+            --site-url http://127.0.0.1:4321/ \
+            --app-url http://127.0.0.1:3100/app
 
       - name: Lighthouse public site
         run: |
