@@ -9,8 +9,22 @@ These values are server-side only:
 - `OPENROUTER_API_KEY`
 - `LIVEKIT_API_KEY`
 - `LIVEKIT_API_SECRET`
+- `VEYLO_INVITE_SECRET`
 
 Never expose them through browser bundles, public repository files, screenshots, or `NEXT_PUBLIC_*` variables.
+
+## Signed room invites
+
+When `VEYLO_INVITE_SECRET` is configured, Veylo generates time-limited HMAC-signed room links. The room name and expiry are covered by the signature, and the server uses constant-time signature comparison before issuing a LiveKit participant token.
+
+The invite layer deliberately does not introduce user accounts:
+
+- room creator requests an invite from the same-origin Veylo app
+- the shared URL carries the time-limited invite token
+- joining the room requires that token when production invite protection is enabled
+- local development can leave `VEYLO_INVITE_SECRET` blank
+
+Signed invites reduce casual room guessing/reuse. They are not a substitute for organization authentication if Veylo later becomes a public multi-tenant service.
 
 ## Current controls
 
@@ -18,6 +32,7 @@ Never expose them through browser bundles, public repository files, screenshots,
 - per-IP rate limiting for the single-instance app deployment
 - payload and text-size limits
 - validated room-name format before LiveKit token creation
+- signed/time-limited room invites in production
 - short-lived LiveKit participant tokens
 - no-store responses for sensitive runtime endpoints
 - baseline browser security headers at the development reverse proxy
