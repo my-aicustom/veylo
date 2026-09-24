@@ -3,6 +3,8 @@
 import * as React from 'react';
 import { useRouter } from 'next/navigation';
 import { apiUrl } from '@/lib/paths';
+import { clearLatencyTraces, loadLatencyTraces } from '@/lib/latency-telemetry';
+import type { LatencyTrace } from '@/lib/types';
 
 type Health = {
   app: string;
@@ -30,16 +32,31 @@ function state(value: boolean | undefined) {
   return value ? 'good' : 'bad';
 }
 
+function formatMs(value?: number) {
+  if (value === undefined || !Number.isFinite(value)) return '—';
+  return value >= 1000 ? `${(value / 1000).toFixed(2)}s` : `${Math.round(value)}ms`;
+}
+
+function median(values: Array<number | undefined>) {
+  const clean = values.filter((value): value is number => typeof value === 'number' && Number.isFinite(value));
+  if (!clean.length) return undefined;
+  const sorted = [...clean].sort((a, b) => a - b);
+  const middle = Math.floor(sorted.length / 2);
+  return sorted.length % 2 ? sorted[middle] : (sorted[middle - 1] + sorted[middle]) / 2;
+}
+
 export default function DiagnosticsPage() {
   const router = useRouter();
   const [health, setHealth] = React.useState<Health | null>(null);
   const [browser, setBrowser] = React.useState<BrowserChecks | null>(null);
   const [runtime, setRuntime] = React.useState<{ online: boolean; secureContext: boolean } | null>(null);
+  const [latencyTraces, setLatencyTraces] = React.useState<LatencyTrace[]>([]);
   const [running, setRunning] = React.useState(false);
   const [error, setError] = React.useState('');
 
   React.useEffect(() => {
     setRuntime({ online: navigator.onLine, secureContext: window.isSecureContext });
+    setLatencyTraces(loadLatencyTraces());
 
     const onOnline = () => setRuntime((current) => ({ online: true, secureContext: current?.secureContext ?? window.isSecureContext }));
     const onOffline = () => setRuntime((current) => ({ online: false, secureContext: current?.secureContext ?? window.isSecureContext }));
@@ -98,6 +115,7 @@ export default function DiagnosticsPage() {
 
       setBrowser(basic);
       setRuntime({ online: basic.online, secureContext: basic.secureContext });
+      setLatencyTraces(loadLatencyTraces());
 
       const response = await fetch(apiUrl('/api/health?deep=1'), { cache: 'no-store' });
       const body = await response.json();
@@ -110,9 +128,22 @@ export default function DiagnosticsPage() {
     }
   }
 
+  function clearTelemetry() {
+    clearLatencyTraces();
+    setLatencyTraces([]);
+  }
+
   const config = health?.config || {};
   const openrouter = health?.checks?.openrouter;
   const livekit = health?.checks?.livekit;
+  const latestLatency = latencyTraces[latencyTraces.length - 1];
+
+  const latencySummary = {
+    endToEnd: median(latencyTraces.map((trace) => trace.endToEndPlaybackMs)),
+    stt: median(latencyTraces.map((trace) => trace.sttMs)),
+    translate: median(latencyTraces.map((trace) => trace.translateMs)),
+    ttsPlayback: median(latencyTraces.map((trace) => trace.ttsPlaybackStartMs)),
+  };
 
   return (
     <main className="diagnostics-shell">
@@ -124,7 +155,7 @@ export default function DiagnosticsPage() {
       <section className="diagnostics-hero">
         <div className="eyebrow">LOCAL / CONNECTION CHECK</div>
         <h1>Know what failed.<br />Before debugging.</h1>
-        <p className="lede">Checks browser media access, WebRTC support, server configuration, LiveKit reachability, and OpenRouter model availability. Secrets are never returned to the browser.</p>
+        <p className="lede">Checks browser media access, WebRTC support, server configuration, LiveKit reachability, OpenRouter model availability, and local interpreter latency traces. Secrets and conversation timing data stay on this device.</p>
         <button className="primary" onClick={runChecks} disabled={running}>{running ? 'Running checks…' : 'Run full diagnostics'}</button>
         {error && <div className="error-box">{error}</div>}
       </section>
@@ -171,11 +202,76 @@ export default function DiagnosticsPage() {
         </article>
       </section>
 
+      <section className="latency-history">
+        <div className="latency-history-head">
+          <div>
+            <div className="eyebrow">LIVE INTERPRETER LATENCY</div>
+            <h2>Local timing traces</h2>
+            <p>Measured with the browser's monotonic high-resolution clock. Median values exclude stages that did not run, such as translation/TTS on same-language turns.</p>
+          </div>
+          {latencyTraces.length > 0 && <button className="ghost small" onClick={clearTelemetry}>Clear traces</button>}
+        </div>
+
+        {latencyTraces.length === 0 ? (
+          <div className="latency-empty">No interpreter traces yet. Run a translated Live Call, then return here.</div>
+        ) : (
+          <>
+            <div className="latency-summary">
+              <LatencyMetric label="Latest E2E" value={latestLatency?.endToEndPlaybackMs} />
+              <LatencyMetric label="Median E2E" value={latencySummary.endToEnd} />
+              <LatencyMetric label="Median STT" value={latencySummary.stt} />
+              <LatencyMetric label="Median Translate" value={latencySummary.translate} />
+              <LatencyMetric label="Median TTS start" value={latencySummary.ttsPlayback} />
+            </div>
+
+            <div className="latency-table-wrap">
+              <table className="latency-table">
+                <thead>
+                  <tr>
+                    <th>Time</th>
+                    <th>Speaker</th>
+                    <th>E2E</th>
+                    <th>STT</th>
+                    <th>TR</th>
+                    <th>TTS response</th>
+                    <th>TTS start</th>
+                    <th>Mode</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {latencyTraces.slice(-8).reverse().map((trace) => (
+                    <tr key={trace.id}>
+                      <td>{new Date(trace.at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })}</td>
+                      <td>{trace.participantName || 'Participant'}</td>
+                      <td>{formatMs(trace.endToEndPlaybackMs)}</td>
+                      <td>{formatMs(trace.sttMs)}</td>
+                      <td>{formatMs(trace.translateMs)}</td>
+                      <td>{formatMs(trace.ttsResponseMs)}</td>
+                      <td>{formatMs(trace.ttsPlaybackStartMs)}</td>
+                      <td>{trace.playbackMode}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </>
+        )}
+      </section>
+
       <section className="diag-guidance">
         <strong>Interpretation</strong>
-        <p>If browser checks fail, fix permission/HTTPS/device access first. If LiveKit is unreachable, inspect WSS/DNS/firewall/TURN. If OpenRouter is unreachable or a model is not listed, fix the API key or model configuration before testing speech translation.</p>
+        <p>If browser checks fail, fix permission/HTTPS/device access first. If LiveKit is unreachable, inspect WSS/DNS/firewall/TURN. If OpenRouter is unreachable or a model is not listed, fix the API key or model configuration. For latency, compare STT, translation, and TTS-start medians before changing models or infrastructure.</p>
       </section>
     </main>
+  );
+}
+
+function LatencyMetric({ label, value }: { label: string; value?: number }) {
+  return (
+    <div className="latency-metric">
+      <span>{label}</span>
+      <strong>{formatMs(value)}</strong>
+    </div>
   );
 }
 
