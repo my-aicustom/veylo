@@ -1,6 +1,6 @@
 {
   "name": "veylo",
-  "version": "0.4.7",
+  "version": "0.5.0",
   "private": true,
   "description": "Veylo internal multilingual communication: Astro marketing site + self-hosted LiveKit application + OpenRouter interpretation.",
   "license": "Apache-2.0",
@@ -14,7 +14,10 @@
     "build:site": "pnpm --filter @veylo/site build",
     "build:app": "pnpm --filter @veylo/app build",
     "typecheck": "pnpm --filter @veylo/app typecheck",
-    "audit:static": "node scripts/project-audit.mjs"
+    "audit:static": "node scripts/project-audit.mjs",
+    "test": "node --test tests/*.test.mjs",
+    "readiness": "node scripts/production-readiness.mjs",
+    "readiness:template": "node scripts/production-readiness.mjs --template"
   },
   "devDependencies": {
     "concurrently": "^9.2.1"
