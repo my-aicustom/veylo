@@ -6,16 +6,10 @@ import { ALL_LANGUAGE_CODES, COUNTRIES } from '@/lib/countries';
 import { countryName, defaultLanguage, loadProfile } from '@/lib/profile';
 import { PhraseRecorder } from '@/lib/wav-recorder';
 import { playSpeech, simulate, transcribe, translate } from '@/lib/client-ai';
+import { listAudioDevices, type AudioDeviceChoice } from '@/lib/audio-devices';
+import { clearSimulation, downloadSimulation, loadSimulation, saveSimulation, type SimulationTurn } from '@/lib/simulation-persistence';
 import type { Profile } from '@/lib/types';
 import { ProfileForm } from '@/components/ProfileForm';
-
-type SimTurn = {
-  id: string;
-  speaker: 'you' | 'ai';
-  text: string;
-  translation?: string;
-  at: string;
-};
 
 export default function SimulationPage() {
   const router = useRouter();
@@ -27,43 +21,82 @@ export default function SimulationPage() {
   const [scenario, setScenario] = React.useState('Trade Expo Indonesia business meeting');
   const [running, setRunning] = React.useState(false);
   const [status, setStatus] = React.useState('Ready');
-  const [turns, setTurns] = React.useState<SimTurn[]>([]);
+  const [turns, setTurns] = React.useState<SimulationTurn[]>([]);
+  const [inputs, setInputs] = React.useState<AudioDeviceChoice[]>([]);
+  const [outputs, setOutputs] = React.useState<AudioDeviceChoice[]>([]);
+  const [inputDeviceId, setInputDeviceId] = React.useState('default');
+  const [outputDeviceId, setOutputDeviceId] = React.useState('default');
+  const [outputSelectionSupported, setOutputSelectionSupported] = React.useState(false);
   const recorderRef = React.useRef<PhraseRecorder | null>(null);
   const queueRef = React.useRef<Promise<void>>(Promise.resolve());
-  const turnsRef = React.useRef<SimTurn[]>([]);
+  const turnsRef = React.useRef<SimulationTurn[]>([]);
+  const sessionId = React.useMemo(() => `simulation:${country}:${role.trim().toLowerCase().slice(0, 36)}:${scenario.trim().toLowerCase().slice(0, 48)}`, [country, role, scenario]);
   const alive = React.useRef(false);
 
-  React.useEffect(() => { setProfile(loadProfile()); setChecked(true); }, []);
+  const refreshDevices = React.useCallback(async () => {
+    try {
+      const devices = await listAudioDevices();
+      setInputs(devices.inputs);
+      setOutputs(devices.outputs);
+      setOutputSelectionSupported(devices.outputSelectionSupported);
+    } catch {}
+  }, []);
+
+  React.useEffect(() => {
+    setProfile(loadProfile());
+    try {
+      setInputDeviceId(window.localStorage.getItem('veylo:sim-input') || 'default');
+      setOutputDeviceId(window.localStorage.getItem('veylo:sim-output') || 'default');
+    } catch {}
+    void refreshDevices();
+    setChecked(true);
+  }, [refreshDevices]);
   React.useEffect(() => setLanguage(defaultLanguage(country)), [country]);
+  React.useEffect(() => {
+    const restored = loadSimulation(sessionId);
+    turnsRef.current = restored;
+    setTurns(restored);
+  }, [sessionId]);
   React.useEffect(() => { turnsRef.current = turns; }, [turns]);
   React.useEffect(() => () => recorderRef.current?.stop(), []);
+  React.useEffect(() => {
+    const handler = () => void refreshDevices();
+    navigator.mediaDevices?.addEventListener?.('devicechange', handler);
+    return () => navigator.mediaDevices?.removeEventListener?.('devicechange', handler);
+  }, [refreshDevices]);
 
   async function play(text: string) {
     recorderRef.current?.pause();
     try {
-      await playSpeech(text);
+      await playSpeech(text, outputDeviceId);
     } finally {
       if (alive.current) recorderRef.current?.resume();
     }
   }
 
+  function commit(next: SimulationTurn[]) {
+    const bounded = next.slice(-160);
+    turnsRef.current = bounded;
+    setTurns(bounded);
+    saveSimulation(sessionId, bounded);
+  }
+
   async function process(bytes: Uint8Array) {
     if (!profile || !alive.current) return;
     setStatus('Understanding you…');
-    const stt = await transcribe(bytes, profile.preferredLanguage);
+    const stt = await transcribe(bytes);
     const text = stt.text.trim();
     if (!text || !alive.current) return;
 
     const priorHistory = turnsRef.current.slice(-12);
-    const userTurn: SimTurn = {
+    const userTurn: SimulationTurn = {
       id: crypto.randomUUID(),
       speaker: 'you',
       text,
       at: new Date().toISOString(),
     };
     const history = [...turnsRef.current, userTurn];
-    turnsRef.current = history;
-    setTurns(history);
+    commit(history);
     setStatus('Counterpart is responding…');
 
     const result = await simulate({
@@ -81,15 +114,14 @@ export default function SimulationPage() {
     });
     if (!alive.current) return;
 
-    const aiTurn: SimTurn = {
+    const aiTurn: SimulationTurn = {
       id: crypto.randomUUID(),
       speaker: 'ai',
       text: result.reply,
       at: new Date().toISOString(),
     };
     const next = [...turnsRef.current, aiTurn];
-    turnsRef.current = next;
-    setTurns(next);
+    commit(next);
     setStatus('Speaking…');
 
     const subtitlePromise = language.toLowerCase() !== profile.preferredLanguage.toLowerCase()
@@ -103,8 +135,7 @@ export default function SimulationPage() {
           const updated = turnsRef.current.map((turn) =>
             turn.id === aiTurn.id ? { ...turn, translation: translated.text } : turn,
           );
-          turnsRef.current = updated;
-          setTurns(updated);
+          commit(updated);
         }).catch((error) => {
           console.warn('[simulation] subtitle translation failed', error);
         })
@@ -118,8 +149,14 @@ export default function SimulationPage() {
     if (!profile) return;
     try {
       const stream = await navigator.mediaDevices.getUserMedia({
-        audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true },
+        audio: {
+          ...(inputDeviceId !== 'default' ? { deviceId: { exact: inputDeviceId } } : {}),
+          echoCancellation: true,
+          noiseSuppression: true,
+          autoGainControl: true,
+        },
       });
+      await refreshDevices();
       alive.current = true;
       queueRef.current = Promise.resolve();
       const recorder = new PhraseRecorder(stream, {
@@ -150,6 +187,22 @@ export default function SimulationPage() {
     recorderRef.current = null;
     setRunning(false);
     setStatus('Stopped');
+  }
+
+  function rememberInput(value: string) {
+    setInputDeviceId(value);
+    try { window.localStorage.setItem('veylo:sim-input', value); } catch {}
+  }
+
+  function rememberOutput(value: string) {
+    setOutputDeviceId(value);
+    try { window.localStorage.setItem('veylo:sim-output', value); } catch {}
+  }
+
+  function resetSimulation() {
+    turnsRef.current = [];
+    setTurns([]);
+    clearSimulation(sessionId);
   }
 
   if (!checked) return <main className="center-screen">Loading…</main>;
@@ -190,6 +243,8 @@ export default function SimulationPage() {
             </label>
             <label><span>Role</span><input value={role} disabled={running} onChange={(e) => setRole(e.target.value)} /></label>
             <label className="wide"><span>Scenario</span><input value={scenario} disabled={running} onChange={(e) => setScenario(e.target.value)} /></label>
+            <label><span>Microphone input</span><select value={inputDeviceId} disabled={running} onChange={(e) => rememberInput(e.target.value)}><option value="default">System default</option>{inputs.filter((item) => item.deviceId !== 'default').map((item) => <option key={item.deviceId} value={item.deviceId}>{item.label}</option>)}</select></label>
+            <label><span>AI voice output</span><select value={outputDeviceId} onChange={(e) => rememberOutput(e.target.value)} disabled={!outputSelectionSupported}><option value="default">System default</option>{outputs.filter((item) => item.deviceId !== 'default').map((item) => <option key={item.deviceId} value={item.deviceId}>{item.label}</option>)}</select></label>
           </div>
 
           <div className="route-card">
@@ -204,7 +259,10 @@ export default function SimulationPage() {
         </div>
 
         <div className="transcript-card" aria-live="polite">
-          <div className="eyebrow">CONVERSATION</div>
+          <div className="transcript-card-head">
+            <div><div className="eyebrow">CONVERSATION</div><small>Simulation history is retained locally for this scenario.</small></div>
+            {turns.length > 0 && <div className="transcript-card-actions"><button className="ghost small" onClick={() => downloadSimulation(turns, role, countryName(country))}>Download</button><button className="ghost small" onClick={resetSimulation}>Clear</button></div>}
+          </div>
           {turns.length === 0 ? (
             <p className="empty-caption">Your simulated conversation will appear here.</p>
           ) : turns.map((turn) => (

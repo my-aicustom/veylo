@@ -10,7 +10,7 @@ const goodEnv = {
   LIVEKIT_API_KEY: 'prod-api-key-123',
   LIVEKIT_API_SECRET: 'a-strong-production-secret-123456',
   VEYLO_INVITE_SECRET: 'a-random-invite-secret-longer-than-32-characters',
-  OPENROUTER_API_KEY: 'sk-or-v1-example-realistic-key',
+  OPENROUTER_API_KEY: 'test-openrouter-key-abcdefghijklmnopqrstuvwxyz',
   VEYLO_AI_MAX_REQUESTS_PER_HOUR: '1200',
   VEYLO_AI_MAX_TRACKED_COST_USD_PER_DAY: '10',
 };

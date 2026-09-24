@@ -11,8 +11,9 @@ import {
 } from 'livekit-client';
 import { PhraseRecorder } from './wav-recorder';
 import { parseParticipantMetadata } from './participant-context';
+import { normalizeDetectedLanguage } from './countries';
 import { mediate, playSpeech, transcribe, translate } from './client-ai';
-import { clearTranscript, loadTranscript, saveTranscript } from './transcript-persistence';
+import { clearTranscript, loadTranscript, saveTranscript, trimTranscript } from './transcript-persistence';
 import { recordLatencyTrace } from './latency-telemetry';
 import type { LatencyTrace, Profile, TranscriptTurn } from './types';
 
@@ -26,7 +27,7 @@ export function useRemoteInterpreter(
   room: Room,
   profile: Profile | null,
   enabled: boolean,
-  options?: { targetLanguage?: string; sessionId?: string },
+  options?: { targetLanguage?: string; sessionId?: string; outputDeviceId?: string; glossary?: string[] },
 ) {
   const [turns, setTurns] = React.useState<TranscriptTurn[]>([]);
   const [status, setStatus] = React.useState('Interpreter off');
@@ -34,8 +35,18 @@ export function useRemoteInterpreter(
   const [latestLatency, setLatestLatency] = React.useState<LatencyTrace | null>(null);
   const turnsRef = React.useRef<TranscriptTurn[]>([]);
   const lanes = React.useRef(new Map<string, Lane>());
+  const localRecorder = React.useRef<PhraseRecorder | null>(null);
+  const localQueue = React.useRef<Promise<void>>(Promise.resolve());
   const speechQueue = React.useRef<Promise<void>>(Promise.resolve());
+  const speechPending = React.useRef(0);
+  const mediatorBusy = React.useRef(false);
+  const mediatorLastAt = React.useRef(0);
   const stopped = React.useRef(false);
+  const glossaryRef = React.useRef<string[]>(options?.glossary || []);
+
+  React.useEffect(() => {
+    glossaryRef.current = options?.glossary || [];
+  }, [options?.glossary]);
 
   const targetLanguage = options?.targetLanguage || profile?.preferredLanguage || 'en';
   const sessionId = options?.sessionId;
@@ -58,6 +69,19 @@ export function useRemoteInterpreter(
     recordLatencyTrace(trace);
   }, []);
 
+  const maybeMediate = React.useCallback((nextTurns: TranscriptTurn[]) => {
+    const now = Date.now();
+    if (nextTurns.length < 4 || nextTurns.length % 4 !== 0) return;
+    if (mediatorBusy.current || now - mediatorLastAt.current < 15_000) return;
+
+    mediatorBusy.current = true;
+    mediatorLastAt.current = now;
+    void mediate(nextTurns.slice(-10))
+      .then((result) => setMediatorNote(result.note))
+      .catch(() => {})
+      .finally(() => { mediatorBusy.current = false; });
+  }, []);
+
   const processPhrase = React.useCallback(async (
     bytes: Uint8Array,
     participant: RemoteParticipant,
@@ -78,7 +102,7 @@ export function useRemoteInterpreter(
     if (!sourceText || stopped.current || !enabled) return;
 
     const context = parseParticipantMetadata(participant.metadata);
-    const sourceLanguage = (stt.language || '').split('-')[0] || undefined;
+    const sourceLanguage = normalizeDetectedLanguage(stt.language);
     const isSameLanguage = Boolean(
       sourceLanguage &&
       sourceLanguage.toLowerCase() === targetLanguage.toLowerCase()
@@ -86,17 +110,26 @@ export function useRemoteInterpreter(
 
     let translatedText = sourceText;
     let translateMs: number | undefined;
+    let translationState: TranscriptTurn['translationState'] = isSameLanguage ? 'same-language' : 'translated';
 
     if (!isSameLanguage) {
       const translateStartedAt = performance.now();
-      const result = await translate(sourceText, {
-        sourceLanguage,
-        targetLanguage,
-        sourceCountry: context.countryName,
-        targetCountry: profile.countryName,
-      });
-      translateMs = performance.now() - translateStartedAt;
-      translatedText = result.text;
+      try {
+        const result = await translate(sourceText, {
+          sourceLanguage,
+          targetLanguage,
+          sourceCountry: context.countryName,
+          targetCountry: profile.countryName,
+          glossary: glossaryRef.current,
+        });
+        translatedText = result.text;
+      } catch (error) {
+        translationState = 'failed';
+        translatedText = sourceText;
+        console.warn('[interpreter] translation failed; preserving source transcript', error);
+      } finally {
+        translateMs = performance.now() - translateStartedAt;
+      }
     }
     if (stopped.current || !enabled) return;
 
@@ -109,13 +142,12 @@ export function useRemoteInterpreter(
       translatedText,
       sourceLanguage,
       targetLanguage,
+      translationState,
     };
-    const nextTurns = [...turnsRef.current.slice(-79), turn];
+    const nextTurns = trimTranscript([...turnsRef.current, turn]);
     commitTurns(nextTurns);
 
-    if (nextTurns.length >= 2 && nextTurns.length % 2 === 0) {
-      void mediate(nextTurns.slice(-8)).then((result) => setMediatorNote(result.note)).catch(() => {});
-    }
+    maybeMediate(nextTurns);
 
     const traceBase = {
       id: crypto.randomUUID(),
@@ -128,51 +160,123 @@ export function useRemoteInterpreter(
       translateMs,
     };
 
-    if (isSameLanguage) {
+    if (isSameLanguage || translationState === 'failed') {
       commitLatency({
         ...traceBase,
         totalTurnMs: performance.now() - phraseEndedAt,
         playbackMode: 'none',
       });
     } else {
-      setStatus('Speaking translation…');
       const queuedAt = performance.now();
+      const maxSpeechQueue = 2;
+      const maxPlaybackAgeMs = 7_000;
 
-      speechQueue.current = speechQueue.current
-        .then(async () => {
-          const speechQueueMs = performance.now() - queuedAt;
-          if (stopped.current || !enabled) return;
-
-          try { track.setVolume(0.08); } catch {}
-          const ttsStartedAt = performance.now();
-
-          try {
-            const playback = await playSpeech(translatedText);
-            commitLatency({
-              ...traceBase,
-              speechQueueMs,
-              ttsResponseMs: playback.responseMs,
-              ttsFirstChunkMs: playback.firstChunkMs,
-              ttsPlaybackStartMs: playback.playbackStartMs,
-              ttsTotalMs: playback.totalMs,
-              endToEndPlaybackMs: (ttsStartedAt - phraseEndedAt) + playback.playbackStartMs,
-              totalTurnMs: performance.now() - phraseEndedAt,
-              playbackMode: playback.mode,
-            });
-          } finally {
-            try { track.setVolume(1); } catch {}
-          }
-        })
-        .catch((error) => {
-          try { track.setVolume(1); } catch {}
-          console.warn('[interpreter] TTS failed', error);
+      if (speechPending.current >= maxSpeechQueue) {
+        commitLatency({
+          ...traceBase,
+          speechQueueMs: 0,
+          totalTurnMs: performance.now() - phraseEndedAt,
+          playbackMode: 'none',
         });
+        setStatus('Translation ready · audio skipped to stay realtime');
+      } else {
+        speechPending.current += 1;
+        speechQueue.current = speechQueue.current
+          .then(async () => {
+            const speechQueueMs = performance.now() - queuedAt;
+            if (stopped.current || !enabled) return;
 
-      await speechQueue.current;
+            // A delayed synthesized sentence should never duck speech that is happening
+            // several seconds later. Keep its subtitle/transcript and skip stale audio.
+            if (performance.now() - phraseEndedAt > maxPlaybackAgeMs) {
+              commitLatency({
+                ...traceBase,
+                speechQueueMs,
+                totalTurnMs: performance.now() - phraseEndedAt,
+                playbackMode: 'none',
+              });
+              return;
+            }
+
+            setStatus('Speaking translation…');
+            try { track.setVolume(0.08); } catch {}
+            const ttsStartedAt = performance.now();
+
+            try {
+              const playback = await playSpeech(translatedText, options?.outputDeviceId);
+              commitLatency({
+                ...traceBase,
+                speechQueueMs,
+                ttsResponseMs: playback.responseMs,
+                ttsFirstChunkMs: playback.firstChunkMs,
+                ttsPlaybackStartMs: playback.playbackStartMs,
+                ttsTotalMs: playback.totalMs,
+                endToEndPlaybackMs: (ttsStartedAt - phraseEndedAt) + playback.playbackStartMs,
+                totalTurnMs: performance.now() - phraseEndedAt,
+                playbackMode: playback.mode,
+              });
+            } finally {
+              try { track.setVolume(1); } catch {}
+            }
+          })
+          .catch((error) => {
+            try { track.setVolume(1); } catch {}
+            console.warn('[interpreter] TTS failed', error);
+          })
+          .finally(() => {
+            speechPending.current = Math.max(0, speechPending.current - 1);
+            if (!stopped.current && enabled) setStatus('Listening');
+          });
+      }
     }
 
-    if (!stopped.current && enabled) setStatus('Listening');
-  }, [commitLatency, commitTurns, enabled, profile, targetLanguage]);
+    if (!stopped.current && enabled && speechPending.current === 0) setStatus('Listening');
+  }, [commitLatency, commitTurns, enabled, maybeMediate, options?.outputDeviceId, profile, targetLanguage]);
+
+  const processLocalPhrase = React.useCallback(async (
+    bytes: Uint8Array,
+    phraseEndedAt: number,
+  ) => {
+    if (!profile || stopped.current || !enabled) return;
+
+    const processStartedAt = performance.now();
+    const captureQueueMs = processStartedAt - phraseEndedAt;
+    const sttStartedAt = performance.now();
+    const stt = await transcribe(bytes);
+    const sttMs = performance.now() - sttStartedAt;
+    const sourceText = (stt.text || '').trim();
+    if (!sourceText || stopped.current || !enabled) return;
+
+    const sourceLanguage = normalizeDetectedLanguage(stt.language);
+    const turn: TranscriptTurn = {
+      id: crypto.randomUUID(),
+      at: new Date().toISOString(),
+      participantIdentity: room.localParticipant.identity,
+      participantName: profile.name,
+      isLocal: true,
+      sourceText,
+      translatedText: sourceText,
+      sourceLanguage,
+      targetLanguage: sourceLanguage || profile.preferredLanguage,
+      translationState: 'source-only',
+    };
+    const nextTurns = trimTranscript([...turnsRef.current, turn]);
+    commitTurns(nextTurns);
+
+    maybeMediate(nextTurns);
+
+    commitLatency({
+      id: crypto.randomUUID(),
+      at: new Date().toISOString(),
+      participantName: profile.name,
+      sourceLanguage,
+      targetLanguage: sourceLanguage || profile.preferredLanguage,
+      captureQueueMs,
+      sttMs,
+      totalTurnMs: performance.now() - phraseEndedAt,
+      playbackMode: 'none',
+    });
+  }, [commitLatency, commitTurns, enabled, maybeMediate, profile, room.localParticipant]);
 
   React.useEffect(() => {
     stopped.current = !enabled;
@@ -183,11 +287,61 @@ export function useRemoteInterpreter(
         try { lane.track.setVolume(1); } catch {}
       }
       lanes.current.clear();
+      localRecorder.current?.stop();
+      localRecorder.current = null;
+      localQueue.current = Promise.resolve();
       return;
     }
 
     stopped.current = false;
     setStatus('Listening');
+
+    const startLocalLane = async (track: any) => {
+      if (localRecorder.current || !track?.mediaStreamTrack) return;
+      const clone = track.mediaStreamTrack.clone();
+      const stream = new MediaStream([clone]);
+      const recorder = new PhraseRecorder(stream, {
+        silenceMs: 560,
+        minSpeechMs: 260,
+        maxPhraseMs: 4_600,
+        threshold: 0.012,
+        preRollMs: 180,
+        onPhrase: (phrase) => {
+          const phraseEndedAt = performance.now();
+          localQueue.current = localQueue.current
+            .then(() => processLocalPhrase(phrase.bytes, phraseEndedAt))
+            .catch((error) => console.warn('[interpreter] local transcript failed', error));
+        },
+      });
+      localRecorder.current = recorder;
+      try {
+        await recorder.start();
+      } catch (error) {
+        recorder.stop();
+        if (localRecorder.current === recorder) localRecorder.current = null;
+        console.warn('[interpreter] local recorder start failed', error);
+      }
+    };
+
+    const stopLocalLane = () => {
+      localRecorder.current?.stop();
+      localRecorder.current = null;
+      localQueue.current = Promise.resolve();
+    };
+
+    const onLocalPublished = (publication: any) => {
+      if (publication?.source === Track.Source.Microphone && publication.track) {
+        void startLocalLane(publication.track);
+      }
+    };
+    const onLocalUnpublished = (publication: any) => {
+      if (publication?.source === Track.Source.Microphone) stopLocalLane();
+    };
+
+    room.on(RoomEvent.LocalTrackPublished, onLocalPublished);
+    room.on(RoomEvent.LocalTrackUnpublished, onLocalUnpublished);
+    const localMic = room.localParticipant.getTrackPublication(Track.Source.Microphone)?.track;
+    if (localMic) void startLocalLane(localMic);
 
     const startLane = async (
       track: RemoteAudioTrack,
@@ -269,6 +423,9 @@ export function useRemoteInterpreter(
     return () => {
       room.off(RoomEvent.TrackSubscribed, onSubscribed);
       room.off(RoomEvent.TrackUnsubscribed, onUnsubscribed);
+      room.off(RoomEvent.LocalTrackPublished, onLocalPublished);
+      room.off(RoomEvent.LocalTrackUnpublished, onLocalUnpublished);
+      stopLocalLane();
       stopped.current = true;
       for (const lane of lanes.current.values()) {
         lane.recorder.stop();
@@ -276,7 +433,7 @@ export function useRemoteInterpreter(
       }
       lanes.current.clear();
     };
-  }, [enabled, processPhrase, profile, room]);
+  }, [enabled, processLocalPhrase, processPhrase, profile, room]);
 
   return {
     turns,

@@ -1121,3 +1121,41 @@ export const COUNTRY_LANGUAGE_HINTS: Record<string,string[]> = {
 };
 
 export const ALL_LANGUAGE_CODES = Array.from(new Set(Object.values(COUNTRY_LANGUAGE_HINTS).flat())).sort();
+
+let languageNameIndex: Map<string, string> | null = null;
+
+function buildLanguageNameIndex() {
+  const index = new Map<string, string>();
+  for (const code of ALL_LANGUAGE_CODES) index.set(code.toLowerCase(), code);
+  try {
+    const names = new Intl.DisplayNames(['en'], { type: 'language' });
+    for (const code of ALL_LANGUAGE_CODES) {
+      const name = names.of(code)?.toLowerCase().trim();
+      if (name) index.set(name, code);
+    }
+  } catch {}
+  const aliases: Record<string, string> = {
+    'bahasa indonesia': 'id',
+    'indonesia': 'id',
+    'mandarin': 'zh',
+    'mandarin chinese': 'zh',
+    'chinese': 'zh',
+    'cantonese': 'yue',
+    'brazilian portuguese': 'pt',
+    'portuguese brazil': 'pt',
+    'farsi': 'fa',
+  };
+  for (const [name, code] of Object.entries(aliases)) {
+    if (ALL_LANGUAGE_CODES.includes(code)) index.set(name, code);
+  }
+  return index;
+}
+
+export function normalizeDetectedLanguage(value?: string) {
+  const raw = (value || '').trim().toLowerCase().replace(/_/g, '-');
+  if (!raw) return undefined;
+  const first = raw.split('-')[0];
+  if (ALL_LANGUAGE_CODES.includes(first)) return first;
+  languageNameIndex ||= buildLanguageNameIndex();
+  return languageNameIndex.get(raw) || languageNameIndex.get(first) || undefined;
+}

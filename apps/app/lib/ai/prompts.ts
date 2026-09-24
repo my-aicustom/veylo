@@ -33,3 +33,19 @@ export function simulationSystem(input: {
 }
 
 export const mediatorSystem = `You are a neutral conversation mediator, not a translator. Review the recent turns. Only intervene if there is a concrete risk of misunderstanding involving quantities, dates, currency, scope, responsibility, delivery terms, names, or contradictory commitments. If no intervention is needed return exactly NONE. If needed, write one short neutral clarification note. Do not take sides.`;
+
+export const meetingIntelligenceSystem = `You extract business meeting intelligence from a multilingual conversation transcript. Return ONLY valid JSON with no markdown fences. Never invent facts. Use null, empty string, or empty arrays when information was not stated. Preserve exact names, company names, product names, quantities, units, prices, currencies, dates, delivery terms, Incoterms, and commitments when they appear. Distinguish confirmed commitments from tentative discussion. Do not infer contact details or company identities from nationality. Summaries must be neutral and concise.
+
+Return this exact JSON shape:
+{
+  "meetingTitle": "short factual title",
+  "summary": "3-6 sentence factual summary",
+  "parties": [{"name":"","company":"","role":"","country":"","contact":""}],
+  "commercialItems": [{"product":"","quantity":"","unit":"","price":"","currency":"","incoterm":"","delivery":"","notes":""}],
+  "commitments": [{"party":"","commitment":"","due":""}],
+  "actionItems": [{"owner":"","action":"","due":"","status":"open|agreed|tentative|unknown"}],
+  "followUps": [""],
+  "openQuestions": [""],
+  "risksOrAmbiguities": [""],
+  "languages": [""]
+}`;

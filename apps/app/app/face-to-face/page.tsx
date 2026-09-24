@@ -2,13 +2,22 @@
 
 import * as React from 'react';
 import { useRouter } from 'next/navigation';
-import { ALL_LANGUAGE_CODES, COUNTRIES, COUNTRY_LANGUAGE_HINTS } from '@/lib/countries';
+import { ALL_LANGUAGE_CODES, COUNTRIES, COUNTRY_LANGUAGE_HINTS, normalizeDetectedLanguage } from '@/lib/countries';
 import { countryName, defaultLanguage, loadProfile } from '@/lib/profile';
 import { PhraseRecorder } from '@/lib/wav-recorder';
-import { playSpeech, transcribe, translate } from '@/lib/client-ai';
+import { analyzeMeeting, playSpeech, transcribe, translate } from '@/lib/client-ai';
 import { downloadTranscript } from '@/lib/transcript-export';
-import { clearTranscript, loadTranscript, saveTranscript } from '@/lib/transcript-persistence';
-import type { Profile, TranscriptTurn } from '@/lib/types';
+import { clearTranscript, loadTranscript, saveTranscript, trimTranscript } from '@/lib/transcript-persistence';
+import {
+  clearMeetingIntelligence,
+  downloadMeetingBrief,
+  downloadMeetingJson,
+  loadMeetingIntelligence,
+  saveMeetingIntelligence,
+} from '@/lib/meeting-intelligence';
+import { listAudioDevices, type AudioDeviceChoice } from '@/lib/audio-devices';
+import { glossaryToInput, loadSessionGlossary, parseGlossary, saveSessionGlossary } from '@/lib/session-glossary';
+import type { MeetingIntelligence, Profile, TranscriptTurn } from '@/lib/types';
 import { ProfileForm } from '@/components/ProfileForm';
 
 const SESSION_ID = 'face-to-face:active';
@@ -23,22 +32,56 @@ export default function FaceToFacePage() {
   const [running, setRunning] = React.useState(false);
   const [status, setStatus] = React.useState('Ready');
   const [turns, setTurns] = React.useState<TranscriptTurn[]>([]);
+  const [inputs, setInputs] = React.useState<AudioDeviceChoice[]>([]);
+  const [outputs, setOutputs] = React.useState<AudioDeviceChoice[]>([]);
+  const [inputDeviceId, setInputDeviceId] = React.useState('default');
+  const [outputDeviceId, setOutputDeviceId] = React.useState('default');
+  const [outputSelectionSupported, setOutputSelectionSupported] = React.useState(false);
+  const [report, setReport] = React.useState<MeetingIntelligence | null>(null);
+  const [reportBusy, setReportBusy] = React.useState(false);
+  const [reportError, setReportError] = React.useState('');
+  const [glossaryInput, setGlossaryInput] = React.useState('');
+  const [speakerMode, setSpeakerMode] = React.useState<'auto' | 'you' | 'other'>('auto');
   const recorderRef = React.useRef<PhraseRecorder | null>(null);
   const queueRef = React.useRef<Promise<void>>(Promise.resolve());
   const lastSide = React.useRef<'you' | 'other'>('other');
   const alive = React.useRef(false);
 
+  const refreshDevices = React.useCallback(async () => {
+    try {
+      const devices = await listAudioDevices();
+      setInputs(devices.inputs);
+      setOutputs(devices.outputs);
+      setOutputSelectionSupported(devices.outputSelectionSupported);
+    } catch {}
+  }, []);
+
   React.useEffect(() => {
     setProfile(loadProfile());
     setTurns(loadTranscript(SESSION_ID));
+    setReport(loadMeetingIntelligence(SESSION_ID));
+    setGlossaryInput(glossaryToInput(loadSessionGlossary(SESSION_ID)));
+    try {
+      setInputDeviceId(window.localStorage.getItem('veylo:ftf-input') || 'default');
+      setOutputDeviceId(window.localStorage.getItem('veylo:ftf-output') || 'default');
+      const savedSpeakerMode = window.localStorage.getItem('veylo:ftf-speaker-mode');
+      if (savedSpeakerMode === 'you' || savedSpeakerMode === 'other' || savedSpeakerMode === 'auto') setSpeakerMode(savedSpeakerMode);
+    } catch {}
+    void refreshDevices();
     setReady(true);
-  }, []);
+  }, [refreshDevices]);
   React.useEffect(() => setOtherLanguage(defaultLanguage(otherCountry)), [otherCountry]);
   React.useEffect(() => () => recorderRef.current?.stop(), []);
+  React.useEffect(() => {
+    const handler = () => void refreshDevices();
+    navigator.mediaDevices?.addEventListener?.('devicechange', handler);
+    return () => navigator.mediaDevices?.removeEventListener?.('devicechange', handler);
+  }, [refreshDevices]);
 
   function inferSide(detected?: string) {
+    if (speakerMode !== 'auto') return speakerMode;
     if (!profile) return 'other' as const;
-    const lang = (detected || '').split('-')[0];
+    const lang = normalizeDetectedLanguage(detected) || '';
     const myHints = COUNTRY_LANGUAGE_HINTS[profile.countryCode] || [profile.preferredLanguage];
     const theirHints = COUNTRY_LANGUAGE_HINTS[otherCountry] || [otherLanguage];
     const mine = myHints.includes(lang) || lang === profile.preferredLanguage;
@@ -50,7 +93,7 @@ export default function FaceToFacePage() {
 
   function commitTurns(update: (current: TranscriptTurn[]) => TranscriptTurn[]) {
     setTurns((current) => {
-      const next = update(current).slice(-80);
+      const next = trimTranscript(update(current));
       saveTranscript(SESSION_ID, next);
       return next;
     });
@@ -58,13 +101,16 @@ export default function FaceToFacePage() {
 
   function resetTranscript() {
     setTurns([]);
+    setReport(null);
+    setReportError('');
     clearTranscript(SESSION_ID);
+    clearMeetingIntelligence(SESSION_ID);
   }
 
   async function play(text: string) {
     recorderRef.current?.pause();
     try {
-      await playSpeech(text);
+      await playSpeech(text, outputDeviceId);
     } finally {
       if (alive.current) recorderRef.current?.resume();
     }
@@ -76,16 +122,27 @@ export default function FaceToFacePage() {
     const stt = await transcribe(bytes);
     const sourceText = stt.text.trim();
     if (!sourceText || !alive.current) return;
-    const detected = (stt.language || '').split('-')[0] || undefined;
+    const detected = normalizeDetectedLanguage(stt.language);
     const side = inferSide(detected);
     lastSide.current = side;
     const targetLanguage = side === 'you' ? otherLanguage : profile.preferredLanguage;
-    const result = await translate(sourceText, {
-      sourceLanguage: detected,
-      targetLanguage,
-      sourceCountry: side === 'you' ? profile.countryName : countryName(otherCountry),
-      targetCountry: side === 'you' ? countryName(otherCountry) : profile.countryName,
-    });
+    const isSameLanguage = Boolean(detected && detected.toLowerCase() === targetLanguage.toLowerCase());
+    let result = { text: sourceText };
+    let translationState: TranscriptTurn['translationState'] = isSameLanguage ? 'same-language' : 'translated';
+    if (!isSameLanguage) {
+      try {
+        result = await translate(sourceText, {
+          sourceLanguage: detected,
+          targetLanguage,
+          sourceCountry: side === 'you' ? profile.countryName : countryName(otherCountry),
+          targetCountry: side === 'you' ? countryName(otherCountry) : profile.countryName,
+          glossary: parseGlossary(glossaryInput),
+        });
+      } catch (error) {
+        translationState = 'failed';
+        console.warn('[face-to-face] translation failed; preserving source transcript', error);
+      }
+    }
     if (!alive.current) return;
     const turn: TranscriptTurn = {
       id: crypto.randomUUID(),
@@ -95,10 +152,15 @@ export default function FaceToFacePage() {
       translatedText: result.text,
       sourceLanguage: detected,
       targetLanguage,
+      translationState,
     };
     commitTurns((current) => [...current, turn]);
-    setStatus('Speaking translation…');
-    await play(result.text);
+    if (!isSameLanguage && translationState !== 'failed') {
+      setStatus('Speaking translation…');
+      await play(result.text);
+    } else if (translationState === 'failed') {
+      setStatus('Translation temporarily unavailable · transcript preserved');
+    }
     if (alive.current) setStatus('Listening');
   }
 
@@ -106,8 +168,14 @@ export default function FaceToFacePage() {
     if (!profile) return;
     try {
       const stream = await navigator.mediaDevices.getUserMedia({
-        audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true },
+        audio: {
+          ...(inputDeviceId !== 'default' ? { deviceId: { exact: inputDeviceId } } : {}),
+          echoCancellation: true,
+          noiseSuppression: true,
+          autoGainControl: true,
+        },
       });
+      await refreshDevices();
       alive.current = true;
       queueRef.current = Promise.resolve();
       const recorder = new PhraseRecorder(stream, {
@@ -118,14 +186,14 @@ export default function FaceToFacePage() {
         onPhrase: (phrase) => {
           queueRef.current = queueRef.current.then(() => process(phrase.bytes)).catch((error) => {
             console.warn(error);
-            setStatus('AI error · try again');
+            setStatus('AI error · original conversation can continue');
           });
         },
       });
       recorderRef.current = recorder;
       await recorder.start();
       setRunning(true);
-      setStatus('Listening');
+      setStatus('Listening · language auto-detect on');
     } catch (error) {
       alive.current = false;
       setStatus(error instanceof Error ? error.message : 'Could not start microphone');
@@ -140,8 +208,40 @@ export default function FaceToFacePage() {
     setStatus('Stopped');
   }
 
+  async function generateReport() {
+    if (!turns.length || reportBusy) return;
+    setReportBusy(true);
+    setReportError('');
+    try {
+      const result = await analyzeMeeting(turns);
+      setReport(result.report);
+      saveMeetingIntelligence(SESSION_ID, result.report);
+    } catch (error) {
+      setReportError(error instanceof Error ? error.message : 'Could not generate meeting brief');
+    } finally {
+      setReportBusy(false);
+    }
+  }
+
+  function rememberInput(value: string) {
+    setInputDeviceId(value);
+    try { window.localStorage.setItem('veylo:ftf-input', value); } catch {}
+  }
+
+  function rememberOutput(value: string) {
+    setOutputDeviceId(value);
+    try { window.localStorage.setItem('veylo:ftf-output', value); } catch {}
+  }
+
+  function rememberSpeakerMode(value: 'auto' | 'you' | 'other') {
+    setSpeakerMode(value);
+    try { window.localStorage.setItem('veylo:ftf-speaker-mode', value); } catch {}
+  }
+
   if (!ready) return <main className="center-screen">Loading…</main>;
   if (!profile) return <main className="center-screen"><section className="join-card"><h1>Set your profile</h1><ProfileForm onDone={setProfile} /></section></main>;
+
+  const reportStale = Boolean(report && report.sourceTurnCount !== turns.length);
 
   return (
     <main className="tool-shell">
@@ -158,7 +258,16 @@ export default function FaceToFacePage() {
             <label><span>Other person</span><input value={otherName} disabled={running} onChange={(e) => setOtherName(e.target.value)} /></label>
             <label><span>Country</span><select value={otherCountry} disabled={running} onChange={(e) => setOtherCountry(e.target.value)}>{COUNTRIES.map((c) => <option key={c.code} value={c.code}>{c.name}</option>)}</select></label>
             <label><span>Their output language</span><select value={otherLanguage} disabled={running} onChange={(e) => setOtherLanguage(e.target.value)}>{ALL_LANGUAGE_CODES.map((lang) => <option key={lang} value={lang}>{lang.toUpperCase()}</option>)}</select></label>
+            <label><span>Microphone input</span><select value={inputDeviceId} disabled={running} onChange={(e) => rememberInput(e.target.value)}><option value="default">System default</option>{inputs.filter((item) => item.deviceId !== 'default').map((item) => <option key={item.deviceId} value={item.deviceId}>{item.label}</option>)}</select></label>
+            <label><span>Translated audio output</span><select value={outputDeviceId} onChange={(e) => rememberOutput(e.target.value)} disabled={!outputSelectionSupported}><option value="default">System default</option>{outputs.filter((item) => item.deviceId !== 'default').map((item) => <option key={item.deviceId} value={item.deviceId}>{item.label}</option>)}</select></label>
+            <label className="wide"><span>Protected terms / glossary</span><input value={glossaryInput} disabled={running} placeholder="Brand, SKU, product, Incoterm…" onChange={(e) => { const value = e.target.value; setGlossaryInput(value); saveSessionGlossary(SESSION_ID, parseGlossary(value)); }} /></label>
+            <label><span>Speaker attribution</span><select value={speakerMode} onChange={(e) => rememberSpeakerMode(e.target.value as 'auto' | 'you' | 'other')}><option value="auto">Auto by language</option><option value="you">Force speaker = {profile.name}</option><option value="other">Force speaker = {otherName}</option></select></label>
           </div>
+          <div className="device-note">
+            <span>Use an external mic for the table. If both people use the same language or code-switch, override speaker attribution manually.</span>
+            <button className="text-button compact" onClick={refreshDevices}>Refresh devices</button>
+          </div>
+          {!outputSelectionSupported && <p className="fineprint">This browser routes TTS to the operating system's selected speaker/headset.</p>}
           <div className="route-card">
             <div><strong>{profile.name}</strong><span>{profile.countryName} · {profile.preferredLanguage.toUpperCase()}</span></div>
             <span>⇄</span>
@@ -169,23 +278,54 @@ export default function FaceToFacePage() {
 
         <div className="transcript-card">
           <div className="transcript-card-head">
-            <div className="eyebrow">LIVE TRANSCRIPT</div>
+            <div><div className="eyebrow">LIVE TRANSCRIPT</div><small>Source language is auto-detected for each phrase.</small></div>
             {turns.length > 0 && (
               <div className="transcript-card-actions">
-                <button className="ghost small" onClick={() => downloadTranscript(turns, 'face-to-face')}>Download</button>
+                <button className="ghost small" onClick={() => downloadTranscript(turns, 'face-to-face')}>Transcript</button>
+                <button className="ghost small" disabled={reportBusy} onClick={generateReport}>{reportBusy ? 'Analyzing…' : report ? (reportStale ? 'Update brief' : 'Refresh brief') : 'Meeting brief'}</button>
                 <button className="ghost small" onClick={resetTranscript}>Clear</button>
               </div>
             )}
           </div>
           {turns.length === 0 ? <p className="empty-caption">Conversation will appear here.</p> : turns.map((turn) => (
             <div className="turn" key={turn.id}>
-              <span>{turn.participantName}</span>
+              <span>{turn.participantName} · {(turn.sourceLanguage || 'auto').toUpperCase()} → {turn.targetLanguage.toUpperCase()}</span>
               <p>{turn.sourceText}</p>
-              <strong>{turn.translatedText}</strong>
+              <strong>{turn.translationState === 'failed' ? 'Translation unavailable · original preserved' : turn.translatedText}</strong>
             </div>
           ))}
+          {reportError && <div className="error-box compact-error">{reportError}</div>}
+          {report && <MeetingBrief report={report} stale={reportStale} />}
         </div>
       </section>
     </main>
   );
+}
+
+function MeetingBrief({ report, stale }: { report: MeetingIntelligence; stale: boolean }) {
+  return (
+    <section className="meeting-intelligence-card embedded">
+      <div className="meeting-intelligence-body">
+        <div className="meeting-brief-title"><div><div className="eyebrow">MEETING INTELLIGENCE</div><h3>{report.meetingTitle}</h3></div><small>{stale ? 'Transcript changed · update recommended' : `${report.sourceTurnCount} turns analyzed`}</small></div>
+        <p>{report.summary}</p>
+        {report.parties.length > 0 && <ReportList title="Parties" items={report.parties.map((item) => [item.name, item.company, item.role, item.country].filter(Boolean).join(' · '))} />}
+        {report.commercialItems.length > 0 && <ReportList title="Products / commercial" items={report.commercialItems.map((item) => [item.product, item.quantity, item.unit, item.price, item.currency, item.incoterm, item.delivery, item.notes].filter(Boolean).join(' · '))} />}
+        {report.commitments.length > 0 && <ReportList title="Commitments" items={report.commitments.map((item) => `${item.party ? `${item.party}: ` : ''}${item.commitment}${item.due ? ` · ${item.due}` : ''}`)} />}
+        {report.actionItems.length > 0 && <ReportList title="Action items" items={report.actionItems.map((item) => `${item.owner ? `${item.owner}: ` : ''}${item.action}${item.due ? ` · ${item.due}` : ''}${item.status ? ` · ${item.status}` : ''}`)} />}
+        <ReportList title="Follow-ups" items={report.followUps} />
+        <ReportList title="Open questions" items={report.openQuestions} />
+        <ReportList title="Risks / ambiguities" items={report.risksOrAmbiguities} />
+        <div className="report-actions">
+          <button className="text-button" onClick={() => downloadMeetingBrief(report, 'face-to-face')}>Download brief</button>
+          <button className="text-button" onClick={() => downloadMeetingJson(report, 'face-to-face')}>Export JSON</button>
+        </div>
+      </div>
+    </section>
+  );
+}
+
+function ReportList({ title, items }: { title: string; items: string[] }) {
+  const clean = items.filter(Boolean);
+  if (!clean.length) return null;
+  return <div className="report-section"><h4>{title}</h4><ul>{clean.map((item, index) => <li key={`${title}-${index}`}>{item}</li>)}</ul></div>;
 }

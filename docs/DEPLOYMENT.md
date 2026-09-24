@@ -1,4 +1,4 @@
-# Veylo v1.0.0 deployment
+# Veylo v1.3.0 deployment
 
 The root `docker-compose.yml` is a local/internal development composition. Do not expose it unchanged to the public internet.
 
@@ -51,6 +51,14 @@ Replace all placeholders. Then:
 pnpm readiness -- --env .env.production
 ```
 
+Before starting production services, statically validate the actual LiveKit and Nginx files:
+
+```bash
+pnpm infra:check -- --livekit /etc/livekit/livekit.yaml --nginx /etc/nginx/sites-enabled/veylo.conf
+```
+
+This catches missing TURN/TLS, public-IP advertisement, RTC ports, TLS/security headers, proxy forwarding, and leftover example placeholders. It does not replace real reachability tests.
+
 Preflight requires:
 
 - `VEYLO_STRICT_PRODUCTION=true`
@@ -87,8 +95,16 @@ For defense in depth, also configure OpenRouter-side budget/key/workspace guardr
 3. Deploy LiveKit with trusted WSS, public IP advertisement, and TURN/TLS.
 4. Deploy Astro + Next.js behind HTTPS.
 5. Check `/app/api/ready`; do not route production traffic while it returns 503.
-6. Open `/app/diagnostics` and run full diagnostics.
-7. Complete `docs/ACCEPTANCE.md` on real devices and at least two networks.
+6. Run the remote deployment gate from a separate machine:
+   ```bash
+   pnpm acceptance:prod -- --url https://veylo.example.com --deep --expected-version 1.3.0
+   ```
+7. Run a safe HTTP capacity sample:
+   ```bash
+   pnpm capacity:probe -- --url https://veylo.example.com --requests 300 --concurrency 12
+   ```
+8. Open `/app/diagnostics`, run full diagnostics, and export the field report.
+9. Complete `docs/ACCEPTANCE.md` and `docs/FIELD_ACCEPTANCE.md` on real devices and networks.
 
 ## Health endpoints
 

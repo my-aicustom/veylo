@@ -4,6 +4,7 @@ import * as React from 'react';
 import { useRouter } from 'next/navigation';
 import { apiUrl } from '@/lib/paths';
 import { clearLatencyTraces, loadLatencyTraces } from '@/lib/latency-telemetry';
+import { clearNetworkEvents, loadNetworkEvents, type NetworkEventTrace } from '@/lib/network-telemetry';
 import type { LatencyTrace } from '@/lib/types';
 
 type Health = {
@@ -22,10 +23,16 @@ type BrowserChecks = {
   secureContext: boolean;
   mediaDevices: boolean;
   webRtc: boolean;
+  webSocket: boolean;
+  audioWorklet: boolean;
+  outputRouting: boolean;
+  storage: boolean;
   microphone: string;
   camera: string;
   audioInputs: number;
+  audioOutputs: number;
   videoInputs: number;
+  networkType: string;
 };
 
 function state(value: boolean | undefined) {
@@ -51,12 +58,14 @@ export default function DiagnosticsPage() {
   const [browser, setBrowser] = React.useState<BrowserChecks | null>(null);
   const [runtime, setRuntime] = React.useState<{ online: boolean; secureContext: boolean } | null>(null);
   const [latencyTraces, setLatencyTraces] = React.useState<LatencyTrace[]>([]);
+  const [networkEvents, setNetworkEvents] = React.useState<NetworkEventTrace[]>([]);
   const [running, setRunning] = React.useState(false);
   const [error, setError] = React.useState('');
 
   React.useEffect(() => {
     setRuntime({ online: navigator.onLine, secureContext: window.isSecureContext });
     setLatencyTraces(loadLatencyTraces());
+    setNetworkEvents(loadNetworkEvents());
 
     const onOnline = () => setRuntime((current) => ({ online: true, secureContext: current?.secureContext ?? window.isSecureContext }));
     const onOffline = () => setRuntime((current) => ({ online: false, secureContext: current?.secureContext ?? window.isSecureContext }));
@@ -88,11 +97,24 @@ export default function DiagnosticsPage() {
         secureContext: window.isSecureContext,
         mediaDevices: Boolean(navigator.mediaDevices?.getUserMedia),
         webRtc: typeof RTCPeerConnection !== 'undefined',
+        webSocket: typeof WebSocket !== 'undefined',
+        audioWorklet: typeof AudioWorkletNode !== 'undefined',
+        outputRouting: typeof (HTMLMediaElement.prototype as any).setSinkId === 'function',
+        storage: false,
         microphone: 'not tested',
         camera: 'not tested',
         audioInputs: 0,
+        audioOutputs: 0,
         videoInputs: 0,
+        networkType: String((navigator as any).connection?.effectiveType || 'unknown'),
       };
+
+      try {
+        const key = '__veylo_diag_storage__';
+        localStorage.setItem(key, '1');
+        localStorage.removeItem(key);
+        basic.storage = true;
+      } catch {}
 
       if (basic.mediaDevices) {
         try {
@@ -109,6 +131,7 @@ export default function DiagnosticsPage() {
         try {
           const devices = await navigator.mediaDevices.enumerateDevices();
           basic.audioInputs = devices.filter((device) => device.kind === 'audioinput').length;
+          basic.audioOutputs = devices.filter((device) => device.kind === 'audiooutput').length;
           basic.videoInputs = devices.filter((device) => device.kind === 'videoinput').length;
         } catch {}
       }
@@ -116,6 +139,7 @@ export default function DiagnosticsPage() {
       setBrowser(basic);
       setRuntime({ online: basic.online, secureContext: basic.secureContext });
       setLatencyTraces(loadLatencyTraces());
+      setNetworkEvents(loadNetworkEvents());
 
       const response = await fetch(apiUrl('/api/health?deep=1'), { cache: 'no-store' });
       const body = await response.json();
@@ -131,6 +155,43 @@ export default function DiagnosticsPage() {
   function clearTelemetry() {
     clearLatencyTraces();
     setLatencyTraces([]);
+  }
+
+  function clearNetworkTelemetry() {
+    clearNetworkEvents();
+    setNetworkEvents([]);
+  }
+
+  function exportFieldReport() {
+    const report = {
+      report: 'Veylo field diagnostics',
+      generatedAt: new Date().toISOString(),
+      location: window.location.origin,
+      browserIdentity: {
+        userAgent: navigator.userAgent,
+        platform: navigator.platform,
+        language: navigator.language,
+      },
+      browser,
+      health,
+      latency: {
+        samples: latencyTraces.length,
+        summary: latencySummary,
+        traces: latencyTraces,
+      },
+      networkEvents,
+      notes: [
+        'No transcript text, microphone audio, API key, LiveKit secret, or invite secret is included.',
+        'A real two-device call and restrictive-network TURN test must still be recorded separately.',
+      ],
+    };
+    const blob = new Blob([JSON.stringify(report, null, 2)], { type: 'application/json' });
+    const href = URL.createObjectURL(blob);
+    const anchor = document.createElement('a');
+    anchor.href = href;
+    anchor.download = `veylo-field-diagnostics-${new Date().toISOString().replace(/[:.]/g, '-')}.json`;
+    anchor.click();
+    setTimeout(() => URL.revokeObjectURL(href), 1_000);
   }
 
   const config = health?.config || {};
@@ -156,7 +217,10 @@ export default function DiagnosticsPage() {
         <div className="eyebrow">LOCAL / CONNECTION CHECK</div>
         <h1>Know what failed.<br />Before debugging.</h1>
         <p className="lede">Checks browser media access, WebRTC support, server configuration, LiveKit reachability, OpenRouter model availability, and local interpreter latency traces. Secrets and conversation timing data stay on this device.</p>
-        <button className="primary" onClick={runChecks} disabled={running}>{running ? 'Running checks…' : 'Run full diagnostics'}</button>
+        <div className="hero-actions">
+          <button className="primary" onClick={runChecks} disabled={running}>{running ? 'Running checks…' : 'Run full diagnostics'}</button>
+          <button className="ghost" onClick={exportFieldReport} disabled={!browser && !health}>Export field report</button>
+        </div>
         {error && <div className="error-box">{error}</div>}
       </section>
 
@@ -166,10 +230,14 @@ export default function DiagnosticsPage() {
           <Diag label="Online" value={runtime?.online} pending={!runtime} />
           <Diag label="Secure context" value={runtime?.secureContext} pending={!runtime} />
           <Diag label="WebRTC" value={browser?.webRtc} pending={!browser} />
+          <Diag label="WebSocket" value={browser?.webSocket} pending={!browser} />
           <Diag label="Media API" value={browser?.mediaDevices} pending={!browser} />
+          <Diag label="AudioWorklet" value={browser?.audioWorklet} pending={!browser} />
+          <Diag label="Local storage" value={browser?.storage} pending={!browser} />
+          <Diag label="Explicit audio output" value={browser?.outputRouting} pending={!browser} text={browser ? (browser.outputRouting ? 'setSinkId supported' : 'OS default output only') : undefined} />
           <Diag label="Microphone" text={browser?.microphone || 'Run diagnostics'} pending={!browser} />
           <Diag label="Camera" text={browser?.camera || 'Run diagnostics'} pending={!browser} />
-          {browser && <p className="diag-note">{browser.audioInputs} audio input · {browser.videoInputs} video input devices detected</p>}
+          {browser && <p className="diag-note">{browser.audioInputs} audio input · {browser.audioOutputs} audio output · {browser.videoInputs} video input · network {browser.networkType}</p>}
         </article>
 
         <article className="diag-card">
@@ -255,6 +323,35 @@ export default function DiagnosticsPage() {
               </table>
             </div>
           </>
+        )}
+      </section>
+
+      <section className="latency-history">
+        <div className="latency-history-head">
+          <div>
+            <div className="eyebrow">NETWORK RESILIENCE</div>
+            <h2>Connection event history</h2>
+            <p>Local evidence from real calls: offline/online transitions, LiveKit reconnects, poor/lost quality, and browser audio-playback blocks.</p>
+          </div>
+          {networkEvents.length > 0 && <button className="ghost small" onClick={clearNetworkTelemetry}>Clear events</button>}
+        </div>
+        {networkEvents.length === 0 ? (
+          <div className="latency-empty">No network events recorded yet. A normal healthy call may legitimately have none.</div>
+        ) : (
+          <div className="latency-table-wrap">
+            <table className="latency-table">
+              <thead><tr><th>Time</th><th>Event</th><th>Detail</th></tr></thead>
+              <tbody>
+                {networkEvents.slice(-12).reverse().map((event) => (
+                  <tr key={event.id}>
+                    <td>{new Date(event.at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })}</td>
+                    <td>{event.type}</td>
+                    <td>{event.detail || '—'}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         )}
       </section>
 

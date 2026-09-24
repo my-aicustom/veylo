@@ -1,4 +1,4 @@
-# Security boundary — Veylo v1.0.0
+# Security boundary — Veylo v1.3.0
 
 Veylo is designed as a small internal communication application, not a public anonymous multi-tenant service.
 

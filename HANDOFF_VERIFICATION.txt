@@ -1,0 +1,37 @@
+VEYLO v1.3.0 DEPLOYMENT-HARDENING CHECKPOINT
+Date: 2026-09-24
+
+Verification completed in packaging environment:
+- repository/readiness regression tests: 38/38 PASS
+- root static project audit: PASS
+- app TypeScript/TSX transpile audit: PASS (43 files)
+- production template readiness: PASS
+- infrastructure template check: 25/25 PASS
+- capacity probe local self-test: PASS
+- production acceptance/capacity/infra CLI syntax: PASS
+- version sync: root/app/site/runtime = 1.3.0
+
+v1.3.0 additions over v1.2.0:
+- stricter remote deployment acceptance including expected version and security behavior
+- safe public HTTP capacity probe with percentile latency and throughput thresholds
+- browser/device field diagnostics export without transcript/audio/secrets
+- reconnect/offline/poor-quality telemetry for real-call evidence
+- static validator for actual LiveKit TURN/TLS/RTC and Nginx TLS/proxy/security config
+- field acceptance protocol for device, network, speech quality and evidence packaging
+- CI artifact naming fixed to follow the current package version dynamically
+
+Not rerun in this container:
+- pnpm install --frozen-lockfile
+- full Next.js/Astro production build
+- built runtime smoke test
+
+Reason: outbound DNS to registry.npmjs.org is unavailable and Corepack cannot obtain pinned pnpm. No new npm dependency was added by v1.3.0.
+
+Still requires real-environment evidence:
+- actual domain/DNS/TLS
+- public LiveKit WSS + TURN/TLS
+- Windows/Android/iPhone browser/device tests
+- Bluetooth routing
+- real multilingual/accent/noise quality
+- real end-to-end latency
+- concurrent LiveKit/WebRTC VPS and uplink capacity

@@ -1,4 +1,4 @@
-# Local test playbook — Veylo v1.0.0
+# Local test playbook — Veylo v1.3.0
 
 Use this after extracting the verified source ZIP.
 
@@ -109,3 +109,25 @@ Capture:
 - Veylo latency trace if the issue is speech delay
 
 Do not send API keys, LiveKit secrets, invite secret, or TLS private keys.
+
+
+## Original-scope checks
+
+After a short Live Call and Face-to-Face conversation:
+
+- confirm source language changes automatically when the spoken language changes
+- select an external microphone in Face-to-Face
+- select a Bluetooth/headset output in Chrome/Edge when available
+- generate a Meeting Brief and verify names/company/product/quantity/price/currency are only included when actually stated
+- export the brief as Markdown and JSON
+- verify action items, commitments, follow-ups and open questions reflect the transcript
+
+
+## Deployment tooling syntax
+
+```bash
+pnpm acceptance:prod -- --help
+pnpm capacity:probe -- --help
+```
+
+The capacity probe uses public GET routes by default and does not invoke paid AI inference.

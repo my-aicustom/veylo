@@ -112,3 +112,62 @@
   .transcript-card-head { align-items:flex-start; }
   .transcript-card-actions { flex-wrap:wrap; justify-content:flex-end; }
 }
+
+.audio-route-control {
+  padding:10px 15px 12px;
+  border-bottom:1px solid var(--line);
+  display:grid;
+  grid-template-columns:minmax(0,1fr) auto;
+  gap:8px 12px;
+  align-items:end;
+}
+.audio-route-control label { display:flex; flex-direction:column; gap:6px; min-width:0; }
+.audio-route-control label > span { color:var(--soft); font-size:10px; text-transform:uppercase; letter-spacing:.08em; }
+.audio-route-control select {
+  width:100%; min-height:34px; border:1px solid var(--line-strong); border-radius:9px;
+  background:var(--panel-2); color:var(--text); padding:5px 28px 5px 9px; font-size:11px;
+}
+.audio-route-control small { grid-column:1 / -1; color:var(--soft); font-size:10px; line-height:1.45; }
+.text-button.compact { margin:0; white-space:nowrap; }
+.transcript-actions-wrap { flex-wrap:wrap; }
+.compact-error { margin:10px 15px; }
+
+.meeting-intelligence-card {
+  margin:0 14px 14px;
+  border:1px solid var(--line-strong);
+  border-radius:12px;
+  background:#101112;
+  overflow:hidden;
+}
+.meeting-intelligence-card.embedded { margin:22px 0 0; }
+.meeting-intelligence-head {
+  width:100%; border:0; background:transparent; color:var(--text); padding:13px 14px;
+  display:flex; align-items:center; justify-content:space-between; gap:12px; text-align:left;
+}
+.meeting-intelligence-head > span { display:flex; flex-direction:column; gap:4px; }
+.meeting-intelligence-head b { font-size:12px; }
+.meeting-intelligence-head small { color:var(--soft); font-size:10px; font-weight:400; }
+.meeting-intelligence-head em { color:var(--muted); font-size:10px; font-style:normal; }
+.meeting-intelligence-body { padding:14px; border-top:1px solid var(--line); }
+.meeting-intelligence-card.embedded .meeting-intelligence-body { border-top:0; padding:18px; }
+.meeting-intelligence-body h3 { margin:0 0 9px; font-size:18px; letter-spacing:-.025em; }
+.meeting-intelligence-body > p { margin:0 0 16px; color:#d5d7d8; font-size:12px; line-height:1.55; }
+.report-section { padding:11px 0; border-top:1px solid var(--line); }
+.report-section h4 { margin:0 0 7px; color:var(--soft); font-size:9px; text-transform:uppercase; letter-spacing:.1em; }
+.report-section ul { margin:0; padding-left:17px; display:grid; gap:5px; }
+.report-section li { color:#d4d6d8; font-size:11px; line-height:1.45; }
+.report-actions { display:flex; flex-wrap:wrap; gap:14px; padding-top:12px; border-top:1px solid var(--line); }
+.report-actions .text-button { margin:0; }
+.meeting-brief-title { display:flex; align-items:flex-start; justify-content:space-between; gap:18px; }
+.meeting-brief-title .eyebrow { margin-bottom:8px; }
+.meeting-brief-title small { color:var(--soft); font-size:10px; text-align:right; }
+.device-note { margin:12px 0 0; display:flex; align-items:flex-start; justify-content:space-between; gap:12px; color:var(--soft); font-size:11px; line-height:1.5; }
+.device-note .text-button { flex:0 0 auto; }
+
+@media (max-width: 620px) {
+  .audio-route-control { grid-template-columns:1fr; }
+  .audio-route-control small { grid-column:auto; }
+  .meeting-brief-title { flex-direction:column; gap:6px; }
+  .meeting-brief-title small { text-align:left; }
+  .device-note { flex-direction:column; }
+}

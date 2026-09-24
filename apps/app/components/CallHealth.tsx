@@ -2,6 +2,7 @@
 
 import * as React from 'react';
 import { ConnectionQuality, Room, RoomEvent } from 'livekit-client';
+import { recordNetworkEvent } from '@/lib/network-telemetry';
 
 function qualityLabel(quality: ConnectionQuality) {
   switch (quality) {
@@ -28,13 +29,20 @@ export function CallHealth({ room }: { room: Room }) {
 
   React.useEffect(() => {
     const onQuality = (next: ConnectionQuality, participant: { identity: string }) => {
-      if (participant.identity === room.localParticipant.identity) setQuality(next);
+      if (participant.identity !== room.localParticipant.identity) return;
+      setQuality(next);
+      if (next === ConnectionQuality.Poor) recordNetworkEvent('quality-poor');
+      if (next === ConnectionQuality.Lost) recordNetworkEvent('quality-lost');
     };
-    const onReconnecting = () => setReconnecting(true);
-    const onReconnected = () => setReconnecting(false);
-    const onAudio = () => setCanPlayAudio(room.canPlaybackAudio);
-    const onOnline = () => setOnline(true);
-    const onOffline = () => setOnline(false);
+    const onReconnecting = () => { setReconnecting(true); recordNetworkEvent('reconnecting'); };
+    const onReconnected = () => { setReconnecting(false); recordNetworkEvent('reconnected'); };
+    const onAudio = () => {
+      const allowed = room.canPlaybackAudio;
+      setCanPlayAudio(allowed);
+      if (!allowed) recordNetworkEvent('audio-blocked');
+    };
+    const onOnline = () => { setOnline(true); recordNetworkEvent('online'); };
+    const onOffline = () => { setOnline(false); recordNetworkEvent('offline'); };
 
     room.on(RoomEvent.ConnectionQualityChanged, onQuality as any);
     room.on(RoomEvent.Reconnecting, onReconnecting);
@@ -62,6 +70,7 @@ export function CallHealth({ room }: { room: Room }) {
     try {
       await room.startAudio();
       setCanPlayAudio(room.canPlaybackAudio);
+      if (room.canPlaybackAudio) recordNetworkEvent('audio-enabled');
     } catch {
       setCanPlayAudio(false);
     }

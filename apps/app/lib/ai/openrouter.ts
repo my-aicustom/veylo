@@ -112,7 +112,7 @@ export async function stt(audioBase64: string, format: string, language?: string
   }
 }
 
-export async function chat(messages: unknown[], temperature = 0.1) {
+export async function chat(messages: unknown[], temperature = 0.1, maxTokens = 900) {
   const sort = process.env.OPENROUTER_PROVIDER_SORT;
   const provider =
     sort === 'latency' || sort === 'throughput' || sort === 'price'
@@ -124,7 +124,7 @@ export async function chat(messages: unknown[], temperature = 0.1) {
     messages,
     temperature,
     reasoning: { effort: 'minimal', exclude: true },
-    max_tokens: 900,
+    max_tokens: maxTokens,
     usage: { include: true },
     ...(provider ? { provider } : {}),
   });

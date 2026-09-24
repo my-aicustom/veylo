@@ -17,9 +17,11 @@ This directory contains reviewable production templates for Veylo.
 
 ```bash
 pnpm readiness -- --env .env.production
+pnpm infra:check -- --livekit /etc/livekit/livekit.yaml --nginx /etc/nginx/sites-enabled/veylo.conf
 ```
 
-6. Run `/app/diagnostics` after deployment.
-7. Complete `docs/ACCEPTANCE.md`.
+6. Run the remote production acceptance and safe capacity probe from another machine.
+7. Run `/app/diagnostics` after deployment and export a field report.
+8. Complete `docs/ACCEPTANCE.md` and `docs/FIELD_ACCEPTANCE.md`.
 
 Do not commit a populated production env file or TLS private key.

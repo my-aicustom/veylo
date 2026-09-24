@@ -261,3 +261,13 @@ h1 { margin: 0; font-size: clamp(42px, 7vw, 92px); line-height: .95; letter-spac
   .latency-metric { min-height:78px; }
   .latency-metric strong { font-size:19px; }
 }
+
+.glossary-control { padding: 12px 15px; border-bottom: 1px solid var(--line); display: grid; gap: 6px; }
+.glossary-control label { display: grid; gap: 6px; color: var(--muted); font-size: 12px; }
+.glossary-control input { width: 100%; background: rgba(255,255,255,.04); color: var(--text); border: 1px solid var(--line); border-radius: 9px; padding: 9px 10px; font: inherit; }
+.glossary-control small { color: var(--muted); font-size: 11px; line-height: 1.35; }
+
+/* Diagnostics field-acceptance controls */
+.diagnostics-hero .hero-actions { display:flex; flex-wrap:wrap; gap:12px; align-items:center; margin-top:28px; }
+.diagnostics-hero .hero-actions .primary { margin-top:0; }
+@media (max-width: 640px) { .diagnostics-hero .hero-actions { align-items:stretch; flex-direction:column; } .diagnostics-hero .hero-actions button { width:100%; } }

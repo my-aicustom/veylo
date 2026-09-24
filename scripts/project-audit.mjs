@@ -7,11 +7,18 @@ const required = [
   'apps/site/package.json',
   'apps/app/app/rooms/[roomName]/room-page-client.tsx',
   'apps/app/app/api/connection-details/route.ts',
+  'apps/app/app/api/intelligence/route.ts',
   'apps/app/lib/ai/openrouter.ts',
+  'apps/app/lib/session-glossary.ts',
+  'apps/app/lib/simulation-persistence.ts',
   'infra/livekit.yaml',
   'BRAND_STATUS.md',
   'docs/DESIGN_SYSTEM.md',
   'docs/COPY_GUIDE.md',
+  'docs/FIELD_ACCEPTANCE.md',
+  'scripts/capacity-probe.mjs',
+  'scripts/infrastructure-check.mjs',
+  'apps/app/lib/network-telemetry.ts',
 ];
 let failed = false;
 for (const rel of required) {

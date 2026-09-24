@@ -1,11 +1,13 @@
 {
   "name": "veylo",
-  "version": "1.0.0",
+  "version": "1.3.0",
   "private": true,
   "description": "Veylo internal multilingual communication: Astro marketing site + self-hosted LiveKit application + OpenRouter interpretation.",
   "license": "Apache-2.0",
   "packageManager": "pnpm@10.18.2",
-  "engines": { "node": ">=20" },
+  "engines": {
+    "node": ">=20"
+  },
   "scripts": {
     "dev": "concurrently -n site,app -c cyan,magenta \"pnpm --filter @veylo/site dev\" \"pnpm --filter @veylo/app dev\"",
     "dev:site": "pnpm --filter @veylo/site dev",
@@ -18,7 +20,11 @@
     "test": "node --test tests/*.test.mjs",
     "readiness": "node scripts/production-readiness.mjs",
     "readiness:template": "node scripts/production-readiness.mjs --template",
-    "smoke:runtime": "node scripts/runtime-smoke.mjs"
+    "smoke:runtime": "node scripts/runtime-smoke.mjs",
+    "acceptance:prod": "node scripts/production-acceptance.mjs",
+    "capacity:probe": "node scripts/capacity-probe.mjs",
+    "infra:check": "node scripts/infrastructure-check.mjs",
+    "infra:check:template": "node scripts/infrastructure-check.mjs --template"
   },
   "devDependencies": {
     "concurrently": "^9.2.1"

@@ -16,9 +16,11 @@ export function transcriptToText(turns: TranscriptTurn[]) {
       turn.targetLanguage?.toUpperCase(),
     ].filter(Boolean).join(' → ');
     return [
-      `[${clock(turn.at)}] ${turn.participantName || 'Participant'}${route ? ` · ${route}` : ''}`,
+      `[${clock(turn.at)}] ${turn.participantName || 'Participant'}${turn.isLocal ? ' · YOU' : ''}${route ? ` · ${route}` : ''}`,
       `Original: ${turn.sourceText}`,
-      `Translation: ${turn.translatedText}`,
+      turn.translationState === 'failed'
+        ? 'Translation: [temporarily unavailable — original text preserved]'
+        : `Translation: ${turn.translatedText}`, 
     ].join('\n');
   }).join('\n\n');
 }

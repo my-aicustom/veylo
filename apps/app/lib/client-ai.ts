@@ -1,24 +1,44 @@
 'use client';
 
-import type { Profile, SpeechPlaybackTiming, TranscriptTurn } from './types';
+import type { MeetingIntelligence, Profile, SpeechPlaybackTiming, TranscriptTurn } from './types';
 import { apiUrl } from './paths';
 
-async function fetchJson<T>(url: string, body: unknown, timeoutMs = 45_000): Promise<T> {
-  const controller = new AbortController();
-  const timer = window.setTimeout(() => controller.abort(), timeoutMs);
-  try {
-    const response = await fetch(url, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(body),
-      signal: controller.signal,
-    });
-    const payload = await response.json();
-    if (!response.ok) throw new Error(payload?.error || `Request failed ${response.status}`);
-    return payload;
-  } finally {
-    window.clearTimeout(timer);
+const sleep = (ms: number) => new Promise((resolve) => window.setTimeout(resolve, ms));
+
+class ClientRequestError extends Error {
+  constructor(message: string, readonly retryable: boolean) {
+    super(message);
+    this.name = 'ClientRequestError';
   }
+}
+
+async function fetchJson<T>(url: string, body: unknown, timeoutMs = 45_000): Promise<T> {
+  let lastError: unknown;
+  for (let attempt = 0; attempt < 2; attempt += 1) {
+    const controller = new AbortController();
+    const timer = window.setTimeout(() => controller.abort(), timeoutMs);
+    try {
+      const response = await fetch(url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+        signal: controller.signal,
+      });
+      const payload = await response.json().catch(() => ({}));
+      if (response.ok) return payload as T;
+
+      const retryable = response.status === 408 || response.status === 429 || response.status >= 500;
+      throw new ClientRequestError(payload?.error || `Request failed ${response.status}`, retryable);
+    } catch (error) {
+      lastError = error;
+      const retryable = error instanceof ClientRequestError ? error.retryable : true;
+      if (!retryable || attempt === 1) throw error;
+    } finally {
+      window.clearTimeout(timer);
+    }
+    await sleep(250 * (attempt + 1));
+  }
+  throw lastError instanceof Error ? lastError : new Error('Request failed');
 }
 
 function base64(bytes: Uint8Array) {
@@ -40,6 +60,7 @@ export function translate(text: string, args: {
   sourceLanguage?: string;
   sourceCountry?: string;
   targetCountry?: string;
+  glossary?: string[];
 }) {
   return fetchJson<{ text: string; usage?: any }>(apiUrl('/api/translate'), { text, ...args });
 }
@@ -86,14 +107,24 @@ function waitForAudioEnd(audio: HTMLAudioElement) {
   });
 }
 
+async function applyAudioOutput(audio: HTMLAudioElement, outputDeviceId?: string) {
+  if (!outputDeviceId || outputDeviceId === 'default') return;
+  const sinkAudio = audio as HTMLAudioElement & { setSinkId?: (deviceId: string) => Promise<void> };
+  if (typeof sinkAudio.setSinkId === 'function') {
+    try { await sinkAudio.setSinkId(outputDeviceId); } catch {}
+  }
+}
+
 async function playBuffered(
   response: Response,
   startedAt: number,
   responseMs: number,
+  outputDeviceId?: string,
 ): Promise<SpeechPlaybackTiming> {
   const blob = await response.blob();
   const url = URL.createObjectURL(blob);
   const audio = new Audio(url);
+  await applyAudioOutput(audio, outputDeviceId);
   let playbackStartMs = performance.now() - startedAt;
   try {
     await audio.play();
@@ -164,12 +195,14 @@ async function playProgressive(
   contentType: string,
   startedAt: number,
   responseMs: number,
+  outputDeviceId?: string,
 ): Promise<SpeechPlaybackTiming> {
   if (!response.body) throw new Error('TTS response has no stream body');
 
   const mediaSource = new MediaSource();
   const objectUrl = URL.createObjectURL(mediaSource);
   const audio = new Audio(objectUrl);
+  await applyAudioOutput(audio, outputDeviceId);
   let playbackStarted = false;
   let playbackStartMs = 0;
   let firstChunkMs: number | undefined;
@@ -229,7 +262,7 @@ async function playProgressive(
   }
 }
 
-export async function playSpeech(text: string): Promise<SpeechPlaybackTiming> {
+export async function playSpeech(text: string, outputDeviceId?: string): Promise<SpeechPlaybackTiming> {
   const startedAt = performance.now();
   const { response, responseMs } = await requestSpeech(text, startedAt);
   const contentType = (response.headers.get('content-type') || 'audio/mpeg').split(';')[0].trim();
@@ -241,9 +274,9 @@ export async function playSpeech(text: string): Promise<SpeechPlaybackTiming> {
     MediaSource.isTypeSupported(contentType);
 
   if (progressive) {
-    return playProgressive(response, contentType, startedAt, responseMs);
+    return playProgressive(response, contentType, startedAt, responseMs, outputDeviceId);
   }
-  return playBuffered(response, startedAt, responseMs);
+  return playBuffered(response, startedAt, responseMs, outputDeviceId);
 }
 
 export function simulate(input: {
@@ -260,4 +293,9 @@ export function simulate(input: {
 
 export function mediate(turns: TranscriptTurn[]) {
   return fetchJson<{ note: string | null }>(apiUrl('/api/mediate'), { turns });
+}
+
+
+export function analyzeMeeting(turns: TranscriptTurn[]) {
+  return fetchJson<{ report: MeetingIntelligence; usage?: any }>(apiUrl('/api/intelligence'), { turns }, 70_000);
 }

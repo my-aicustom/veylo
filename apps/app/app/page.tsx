@@ -93,7 +93,7 @@ export default function HomePage() {
       <section className="home-hero">
         <div className="eyebrow">PRIVATE CONVERSATION</div>
         <h1>Speak freely.<br />Arrive understood.</h1>
-        <p className="lede">Private multilingual calls on self-hosted LiveKit, with interpretation shaped to each listener through OpenRouter.</p>
+        <p className="lede">Private multilingual calls on self-hosted LiveKit, with OpenRouter interpretation, auto-detected speech, and an exportable business meeting brief.</p>
       </section>
       <section className="mode-grid">
         <article className="mode-card primary-mode">
@@ -104,13 +104,14 @@ export default function HomePage() {
           <div className="join-line"><input value={joinValue} onChange={(e) => setJoinValue(e.target.value)} placeholder="Invite link or room code" onKeyDown={(e) => e.key === 'Enter' && join()} /><button className="ghost" onClick={join}>Join</button></div>
           {roomError && <div className="error-box">{roomError}</div>}
         </article>
-        <article className="mode-card"><span>02</span><h2>Face-to-Face</h2><p>Use one device as an interpreter between two people in the same room.</p><button className="ghost" onClick={() => router.push('/face-to-face')}>Open mode</button></article>
+        <article className="mode-card"><span>02</span><h2>Face-to-Face</h2><p>Use one device as an interpreter between two people, with external-mic and headset routing support.</p><button className="ghost" onClick={() => router.push('/face-to-face')}>Open mode</button></article>
         <article className="mode-card"><span>03</span><h2>AI Simulation</h2><p>Practice a business conversation with an AI counterpart from any country.</p><button className="ghost" onClick={() => router.push('/simulation')}>Open mode</button></article>
       </section>
       <footer className="home-footer">
         <span>Self-hosted communication</span>
         <span>OpenRouter inference</span>
         <span>No user accounts</span>
+        <span>Meeting intelligence export</span>
         <button className="footer-link" onClick={() => router.push('/diagnostics')}>Diagnostics</button>
       </footer>
     </main>
