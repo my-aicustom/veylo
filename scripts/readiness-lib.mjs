@@ -13,16 +13,37 @@ function devLike(value) {
   return DEV_VALUES.has(normalized) || normalized.includes('change_me') || normalized.includes('replace_me');
 }
 
+function parseUrl(value) {
+  try {
+    return new URL(value);
+  } catch {
+    return null;
+  }
+}
+
+function isLocalHost(url) {
+  if (!url) return false;
+  return url.hostname === 'localhost' || url.hostname === '127.0.0.1' || url.hostname === '::1';
+}
+
 export function validateProductionEnv(env) {
   const errors = [];
 
-  if (!present(env.APP_URL)) errors.push('APP_URL is required.');
-  else if (!/^https:///i.test(env.APP_URL)) errors.push('APP_URL must use https:// in production.');
-  else if (/localhost|127.0.0.1/i.test(env.APP_URL)) errors.push('APP_URL must not point to localhost in production.');
+  if (!present(env.APP_URL)) {
+    errors.push('APP_URL is required.');
+  } else {
+    const appUrl = parseUrl(env.APP_URL);
+    if (!appUrl || appUrl.protocol !== 'https:') errors.push('APP_URL must use https:// in production.');
+    else if (isLocalHost(appUrl)) errors.push('APP_URL must not point to localhost in production.');
+  }
 
-  if (!present(env.LIVEKIT_URL)) errors.push('LIVEKIT_URL is required.');
-  else if (!/^wss:///i.test(env.LIVEKIT_URL)) errors.push('LIVEKIT_URL must use wss:// in production.');
-  else if (/localhost|127.0.0.1/i.test(env.LIVEKIT_URL)) errors.push('LIVEKIT_URL must not point to localhost in production.');
+  if (!present(env.LIVEKIT_URL)) {
+    errors.push('LIVEKIT_URL is required.');
+  } else {
+    const livekitUrl = parseUrl(env.LIVEKIT_URL);
+    if (!livekitUrl || livekitUrl.protocol !== 'wss:') errors.push('LIVEKIT_URL must use wss:// in production.');
+    else if (isLocalHost(livekitUrl)) errors.push('LIVEKIT_URL must not point to localhost in production.');
+  }
 
   if (!present(env.LIVEKIT_API_KEY)) errors.push('LIVEKIT_API_KEY is required.');
   else if (devLike(env.LIVEKIT_API_KEY)) errors.push('LIVEKIT_API_KEY still uses a development/placeholder value.');
@@ -46,8 +67,8 @@ export function validateRepository(rootDir) {
   if (compose.includes('livekit/livekit-server:latest')) {
     errors.push('docker-compose.yml must not use livekit/livekit-server:latest.');
   }
-  if (!/livekit/livekit-server:vd+.d+.d+/.test(compose)) {
-    errors.push('docker-compose.yml must pin an explicit LiveKit server version.');
+  if (!compose.includes('livekit/livekit-server:v1.13.7')) {
+    errors.push('docker-compose.yml must pin the approved LiveKit server version.');
   }
 
   const required = [
@@ -63,9 +84,9 @@ export function validateRepository(rootDir) {
 
   if (exists('deploy/production/livekit.yaml.example')) {
     const livekit = read('deploy/production/livekit.yaml.example');
-    if (!/use_external_ip:s*true/.test(livekit)) errors.push('Production LiveKit template must enable use_external_ip.');
-    if (!/turn:s*[sS]*enabled:s*true/.test(livekit)) errors.push('Production LiveKit template must enable TURN.');
-    if (!/tls_port:s*443/.test(livekit)) errors.push('Production LiveKit template must expose TURN/TLS on 443.');
+    if (!livekit.includes('use_external_ip: true')) errors.push('Production LiveKit template must enable use_external_ip.');
+    if (!livekit.includes('turn:') || !livekit.includes('enabled: true')) errors.push('Production LiveKit template must enable TURN.');
+    if (!livekit.includes('tls_port: 443')) errors.push('Production LiveKit template must expose TURN/TLS on 443.');
   }
 
   const ci = read('.github/workflows/ci.yml');
