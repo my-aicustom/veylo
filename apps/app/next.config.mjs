@@ -36,7 +36,7 @@ const nextConfig = {
   productionBrowserSourceMaps: false,
   basePath,
   headers: async () => [{
-    source: '/(.*)',
+    source: '/:path*',
     headers: securityHeaders,
   }],
 };
