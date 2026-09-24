@@ -32,17 +32,36 @@ test('OpenRouter secret remains server-side', () => {
   }
 });
 
-test('health endpoint version is centralized', () => {
-  const health = read('apps/app/app/api/health/route.ts');
-  const version = read('apps/app/lib/version.ts');
-  assert.ok(health.includes('VEYLO_VERSION'));
-  assert.ok(version.includes("'0.5.0'"));
+test('workspace, app, site, and health version stay synchronized', () => {
+  const rootPackage = JSON.parse(read('package.json'));
+  const appPackage = JSON.parse(read('apps/app/package.json'));
+  const sitePackage = JSON.parse(read('apps/site/package.json'));
+  const versionSource = read('apps/app/lib/version.ts');
+
+  assert.equal(rootPackage.version, '0.5.0');
+  assert.equal(appPackage.version, rootPackage.version);
+  assert.equal(sitePackage.version, rootPackage.version);
+  assert.ok(versionSource.includes(`'${rootPackage.version}'`));
+  assert.ok(read('apps/app/app/api/health/route.ts').includes('VEYLO_VERSION'));
 });
 
 test('LiveKit runtime image is pinned', () => {
   const compose = read('docker-compose.yml');
   assert.ok(compose.includes('livekit/livekit-server:v1.13.7'));
   assert.equal(compose.includes('livekit/livekit-server:latest'), false);
+});
+
+test('room token endpoint validates room names', () => {
+  const route = read('apps/app/app/api/connection-details/route.ts');
+  assert.ok(route.includes('ROOM_PATTERN'));
+  assert.ok(route.includes('Invalid room name'));
+});
+
+test('reverse proxy includes baseline browser security headers', () => {
+  const nginx = read('deploy/nginx.conf');
+  for (const header of ['X-Content-Type-Options', 'X-Frame-Options', 'Referrer-Policy', 'Permissions-Policy']) {
+    assert.ok(nginx.includes(header), header);
+  }
 });
 
 test('public homepage still exposes all three conversation modes', () => {
