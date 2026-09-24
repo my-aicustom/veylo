@@ -1,0 +1,102 @@
+name: UI Review
+
+on:
+  push:
+    branches: [main, "feature/**", "fix/**"]
+  pull_request:
+
+jobs:
+  review:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10.18.2
+          run_install: false
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm audit:ui
+      - run: pnpm build
+
+      - name: Start built Veylo
+        env:
+          APP_URL: http://127.0.0.1:3100
+          NEXT_PUBLIC_BASE_PATH: /app
+          LIVEKIT_URL: ws://127.0.0.1:7880
+          LIVEKIT_API_KEY: devkey
+          LIVEKIT_API_SECRET: devsecret
+          VEYLO_INVITE_SECRET: ui-review-secret-that-is-long-enough-for-tests
+          OPENROUTER_API_KEY: ui-review-placeholder
+          VEYLO_AI_MAX_REQUESTS_PER_HOUR: "100"
+          VEYLO_AI_MAX_TRACKED_COST_USD_PER_DAY: "1"
+        run: |
+          mkdir -p ui-review
+          (pnpm --filter @veylo/app start --hostname 127.0.0.1 --port 3100 > ui-review/app.log 2>&1 &)
+          (pnpm --filter @veylo/site preview > ui-review/site.log 2>&1 &)
+          for i in {1..30}; do
+            if curl -fsS http://127.0.0.1:3100/app >/dev/null && curl -fsS http://127.0.0.1:4321 >/dev/null; then
+              exit 0
+            fi
+            sleep 1
+          done
+          echo "Veylo did not become ready"
+          cat ui-review/app.log || true
+          cat ui-review/site.log || true
+          exit 1
+
+      - name: Capture hydrated browser evidence
+        run: |
+          CHROME="$(command -v google-chrome || command -v chromium || command -v chromium-browser)"
+          test -n "$CHROME"
+          node scripts/capture-ui-review.mjs \
+            --chrome "$CHROME" \
+            --output ui-review \
+            --site-url http://127.0.0.1:4321/ \
+            --app-url http://127.0.0.1:3100/app
+
+      - name: Lighthouse public site
+        run: |
+          npx --yes lighthouse@13.5.0 http://127.0.0.1:4321/             --chrome-flags="--headless --no-sandbox --disable-gpu"             --only-categories=performance,accessibility,best-practices,seo             --output=json --output=html --output-path=ui-review/site-lighthouse
+
+      - name: Lighthouse app onboarding
+        run: |
+          npx --yes lighthouse@13.5.0 http://127.0.0.1:3100/app             --chrome-flags="--headless --no-sandbox --disable-gpu"             --only-categories=performance,accessibility,best-practices             --output=json --output=html --output-path=ui-review/app-lighthouse
+
+      - name: Enforce UI score floor
+        run: |
+          node <<'NODE'
+          const fs = require('fs');
+          const site = JSON.parse(fs.readFileSync('ui-review/site-lighthouse.report.json', 'utf8'));
+          const app = JSON.parse(fs.readFileSync('ui-review/app-lighthouse.report.json', 'utf8'));
+          const pct = (x) => Math.round((x || 0) * 100);
+          const scores = {
+            siteAccessibility: pct(site.categories.accessibility?.score),
+            siteBestPractices: pct(site.categories['best-practices']?.score),
+            siteSeo: pct(site.categories.seo?.score),
+            appAccessibility: pct(app.categories.accessibility?.score),
+            appBestPractices: pct(app.categories['best-practices']?.score),
+          };
+          console.log(scores);
+          const failed = Object.entries(scores).filter(([, score]) => score < 90);
+          if (failed.length) {
+            console.error('UI review score floor failed:', failed);
+            process.exit(1);
+          }
+          NODE
+
+      - name: Upload UI review evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ui-review-${{ github.sha }}
+          path: ui-review/
+          if-no-files-found: warn
+          retention-days: 14

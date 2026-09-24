@@ -19,7 +19,7 @@
   min-height:30px;
   padding:0 10px;
   border:1px solid var(--line);
-  border-radius:999px;
+  border-radius:10px;
   background:#101113;
   color:var(--muted);
   font-size:11px;
@@ -74,7 +74,7 @@
   font-size:11px;
   outline:none;
 }
-.language-control select:focus { border-color:#73777d; }
+.language-control select:focus-visible { border-color:var(--accent); }
 .sr-only {
   position:absolute;
   width:1px;
