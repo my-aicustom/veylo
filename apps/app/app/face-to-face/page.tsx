@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation';
 import { ALL_LANGUAGE_CODES, COUNTRIES, COUNTRY_LANGUAGE_HINTS } from '@/lib/countries';
 import { countryName, defaultLanguage, loadProfile } from '@/lib/profile';
 import { PhraseRecorder } from '@/lib/wav-recorder';
-import { speak, transcribe, translate } from '@/lib/client-ai';
+import { playSpeech, transcribe, translate } from '@/lib/client-ai';
 import { downloadTranscript } from '@/lib/transcript-export';
 import { clearTranscript, loadTranscript, saveTranscript } from '@/lib/transcript-persistence';
 import type { Profile, TranscriptTurn } from '@/lib/types';
@@ -64,17 +64,7 @@ export default function FaceToFacePage() {
   async function play(text: string) {
     recorderRef.current?.pause();
     try {
-      const blob = await speak(text);
-      const url = URL.createObjectURL(blob);
-      const audio = new Audio(url);
-      try {
-        await audio.play();
-        await new Promise<void>((resolve) => {
-          audio.onended = () => resolve();
-          audio.onerror = () => resolve();
-          audio.onpause = () => resolve();
-        });
-      } finally { URL.revokeObjectURL(url); }
+      await playSpeech(text);
     } finally {
       if (alive.current) recorderRef.current?.resume();
     }

@@ -12,13 +12,19 @@ export async function POST(request: NextRequest) {
     if (!text) return NextResponse.json({ error: 'text is required' }, { status: 400 });
 
     const response = await tts(text);
-    const bytes = await response.arrayBuffer();
-    return new NextResponse(bytes, {
-      headers: {
-        'Content-Type': response.headers.get('content-type') || 'audio/mpeg',
-        'Cache-Control': 'no-store',
-      },
+    if (!response.body) {
+      return NextResponse.json({ error: 'TTS provider returned an empty stream' }, { status: 502 });
+    }
+
+    const headers = new Headers({
+      'Content-Type': response.headers.get('content-type') || 'audio/mpeg',
+      'Cache-Control': 'no-store, no-transform',
+      'X-Veylo-TTS-Transport': 'stream',
     });
+    const generationId = response.headers.get('x-generation-id');
+    if (generationId) headers.set('X-Generation-Id', generationId);
+
+    return new NextResponse(response.body, { headers });
   } catch (error) {
     return NextResponse.json({ error: error instanceof Error ? error.message : 'TTS failed' }, { status: 502 });
   }

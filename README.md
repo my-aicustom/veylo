@@ -1,4 +1,4 @@
-# VEYLO — v0.4.5
+# VEYLO — v0.4.6
 
 > Working codename. Internal multilingual communication product by MY-AI.
 
@@ -11,6 +11,18 @@ Veylo combines a fast Astro marketing homepage with a self-hosted LiveKit realti
 - **AI Simulation** — practice with an AI counterpart using country, role and scenario context.
 - **Diagnostics** — test browser media, WebRTC, server config, LiveKit reachability, and OpenRouter model availability.
 
+## v0.4.6 lower-latency TTS transport
+
+- TTS audio is streamed through the Next.js gateway instead of being fully buffered on the server first
+- supported browsers use MediaSource progressive playback for `audio/mpeg`
+- playback can start after the first valid audio chunks instead of waiting for the complete MP3 response
+- browsers without MediaSource support keep the previous full-blob playback path
+- the same playback engine is used by Live Call, Face-to-Face, and AI Simulation
+- upstream generation IDs are forwarded when OpenRouter provides them
+- the gateway marks TTS responses with `X-Veylo-TTS-Transport: stream`
+
+OpenRouter documents streaming responses for its speech endpoint. Progressive browser playback is feature-detected because MediaSource support is not universal.
+
 ## v0.4.5 diagnostics
 
 - new `/app/diagnostics` page reachable from the app home
@@ -20,14 +32,6 @@ Veylo combines a fast Astro marketing homepage with a self-hosted LiveKit realti
 - selected STT/translation/TTS model IDs are verified against the OpenRouter model catalog
 - LiveKit reachability is tested from the app server with a short timeout
 - diagnostics UI is responsive and designed for local troubleshooting
-
-## v0.4.4 call health
-
-- Live Call exposes local LiveKit connection quality in the call bar
-- explicit `Reconnecting…` and `Offline` states instead of silently degrading
-- browser autoplay failures surface an `Enable sound` action backed by `room.startAudio()`
-- invite sharing checks native Web Share support and falls back to clipboard
-- responsive health UI collapses to a compact status dot on small screens
 
 ## Local development
 

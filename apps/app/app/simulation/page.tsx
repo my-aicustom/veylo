@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation';
 import { ALL_LANGUAGE_CODES, COUNTRIES } from '@/lib/countries';
 import { countryName, defaultLanguage, loadProfile } from '@/lib/profile';
 import { PhraseRecorder } from '@/lib/wav-recorder';
-import { simulate, speak, transcribe, translate } from '@/lib/client-ai';
+import { playSpeech, simulate, transcribe, translate } from '@/lib/client-ai';
 import type { Profile } from '@/lib/types';
 import { ProfileForm } from '@/components/ProfileForm';
 
@@ -41,19 +41,7 @@ export default function SimulationPage() {
   async function play(text: string) {
     recorderRef.current?.pause();
     try {
-      const blob = await speak(text);
-      const url = URL.createObjectURL(blob);
-      const audio = new Audio(url);
-      try {
-        await audio.play();
-        await new Promise<void>((resolve) => {
-          audio.onended = () => resolve();
-          audio.onerror = () => resolve();
-          audio.onpause = () => resolve();
-        });
-      } finally {
-        URL.revokeObjectURL(url);
-      }
+      await playSpeech(text);
     } finally {
       if (alive.current) recorderRef.current?.resume();
     }
