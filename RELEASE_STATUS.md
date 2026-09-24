@@ -26,6 +26,7 @@ Veylo v1.0.0 contains the complete application architecture and release engineer
 - CSP/HSTS/anti-framing/nosniff/permissions/referrer security-header baseline
 - automated static tests, repository tests, typecheck, production build, Docker Compose validation, and built-runtime smoke tests
 - verified release ZIP, SHA-256 checksum, and build manifest on successful main builds
+- remote production acceptance runner for HTTPS/readiness/security/invite/provider reachability checks
 
 ## What “complete” does not certify
 
