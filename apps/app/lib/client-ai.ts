@@ -44,7 +44,7 @@ export function translate(text: string, args: {
   return fetchJson<{ text: string; usage?: any }>(apiUrl('/api/translate'), { text, ...args });
 }
 
-export async function speak(text: string) {
+async function requestSpeech(text: string) {
   const controller = new AbortController();
   const timer = window.setTimeout(() => controller.abort(), 55_000);
   try {
@@ -58,10 +58,156 @@ export async function speak(text: string) {
       const payload = await response.json().catch(() => ({}));
       throw new Error(payload?.error || `TTS failed ${response.status}`);
     }
-    return response.blob();
+    return response;
   } finally {
     window.clearTimeout(timer);
   }
+}
+
+function waitForAudioEnd(audio: HTMLAudioElement) {
+  return new Promise<void>((resolve, reject) => {
+    const cleanup = () => {
+      audio.removeEventListener('ended', onEnded);
+      audio.removeEventListener('error', onError);
+    };
+    const onEnded = () => {
+      cleanup();
+      resolve();
+    };
+    const onError = () => {
+      cleanup();
+      reject(new Error('Audio playback failed'));
+    };
+    audio.addEventListener('ended', onEnded, { once: true });
+    audio.addEventListener('error', onError, { once: true });
+  });
+}
+
+async function playBuffered(response: Response) {
+  const blob = await response.blob();
+  const url = URL.createObjectURL(blob);
+  const audio = new Audio(url);
+  try {
+    await audio.play();
+    await waitForAudioEnd(audio);
+  } finally {
+    audio.pause();
+    audio.removeAttribute('src');
+    URL.revokeObjectURL(url);
+  }
+}
+
+function waitForSourceOpen(mediaSource: MediaSource) {
+  if (mediaSource.readyState === 'open') return Promise.resolve();
+  return new Promise<void>((resolve, reject) => {
+    const cleanup = () => {
+      mediaSource.removeEventListener('sourceopen', onOpen);
+      mediaSource.removeEventListener('sourceclose', onClose);
+    };
+    const onOpen = () => {
+      cleanup();
+      resolve();
+    };
+    const onClose = () => {
+      cleanup();
+      reject(new Error('MediaSource closed before opening'));
+    };
+    mediaSource.addEventListener('sourceopen', onOpen, { once: true });
+    mediaSource.addEventListener('sourceclose', onClose, { once: true });
+  });
+}
+
+function appendChunk(sourceBuffer: SourceBuffer, chunk: Uint8Array) {
+  return new Promise<void>((resolve, reject) => {
+    const cleanup = () => {
+      sourceBuffer.removeEventListener('updateend', onEnd);
+      sourceBuffer.removeEventListener('error', onError);
+    };
+    const onEnd = () => {
+      cleanup();
+      resolve();
+    };
+    const onError = () => {
+      cleanup();
+      reject(new Error('Streaming audio buffer rejected a chunk'));
+    };
+    sourceBuffer.addEventListener('updateend', onEnd, { once: true });
+    sourceBuffer.addEventListener('error', onError, { once: true });
+    try {
+      sourceBuffer.appendBuffer(chunk);
+    } catch (error) {
+      cleanup();
+      reject(error);
+    }
+  });
+}
+
+async function playProgressive(response: Response, contentType: string) {
+  if (!response.body) throw new Error('TTS response has no stream body');
+
+  const mediaSource = new MediaSource();
+  const objectUrl = URL.createObjectURL(mediaSource);
+  const audio = new Audio(objectUrl);
+  let playbackStarted = false;
+
+  try {
+    await waitForSourceOpen(mediaSource);
+    const sourceBuffer = mediaSource.addSourceBuffer(contentType);
+    try { sourceBuffer.mode = 'sequence'; } catch {}
+
+    const reader = response.body.getReader();
+    try {
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        if (!value?.byteLength) continue;
+
+        await appendChunk(sourceBuffer, value);
+        if (!playbackStarted) {
+          await audio.play();
+          playbackStarted = true;
+        }
+      }
+    } finally {
+      reader.releaseLock();
+    }
+
+    if (sourceBuffer.updating) {
+      await new Promise<void>((resolve) => {
+        sourceBuffer.addEventListener('updateend', () => resolve(), { once: true });
+      });
+    }
+    if (mediaSource.readyState === 'open') mediaSource.endOfStream();
+
+    if (!playbackStarted) {
+      await audio.play();
+      playbackStarted = true;
+    }
+    await waitForAudioEnd(audio);
+  } finally {
+    audio.pause();
+    audio.removeAttribute('src');
+    if (mediaSource.readyState === 'open') {
+      try { mediaSource.endOfStream(); } catch {}
+    }
+    URL.revokeObjectURL(objectUrl);
+  }
+}
+
+export async function playSpeech(text: string) {
+  const response = await requestSpeech(text);
+  const contentType = (response.headers.get('content-type') || 'audio/mpeg').split(';')[0].trim();
+
+  const progressive =
+    Boolean(response.body) &&
+    typeof MediaSource !== 'undefined' &&
+    typeof MediaSource.isTypeSupported === 'function' &&
+    MediaSource.isTypeSupported(contentType);
+
+  if (progressive) {
+    return playProgressive(response, contentType);
+  }
+  return playBuffered(response);
 }
 
 export function simulate(input: {
