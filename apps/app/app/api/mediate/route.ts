@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { chat } from '@/lib/ai/openrouter';
 import { mediatorSystem } from '@/lib/ai/prompts';
+import { guardAiBudget, recordAiUsage } from '@/lib/ai-budget';
 import { cleanText, guardApi } from '@/lib/api-guard';
 
 export async function POST(request: NextRequest) {
@@ -21,12 +22,20 @@ export async function POST(request: NextRequest) {
 
     if (!transcript) return NextResponse.json({ note: null });
 
+    const budgetBlocked = guardAiBudget();
+    if (budgetBlocked) return budgetBlocked;
+
     const result: any = await chat([
       { role: 'system', content: mediatorSystem },
       { role: 'user', content: transcript },
     ], 0);
+    recordAiUsage(result);
+
     const note = result?.choices?.[0]?.message?.content?.trim();
-    return NextResponse.json({ note: !note || note === 'NONE' ? null : note }, { headers: { 'Cache-Control': 'no-store' } });
+    return NextResponse.json(
+      { note: !note || note === 'NONE' ? null : note, usage: result.usage },
+      { headers: { 'Cache-Control': 'no-store' } },
+    );
   } catch (error) {
     return NextResponse.json({ error: error instanceof Error ? error.message : 'Mediation failed' }, { status: 502 });
   }
