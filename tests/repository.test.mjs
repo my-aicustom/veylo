@@ -40,7 +40,7 @@ test('workspace, app, site, and health version stay synchronized', () => {
   const sitePackage = JSON.parse(read('apps/site/package.json'));
   const versionSource = read('apps/app/lib/version.ts');
 
-  assert.equal(rootPackage.version, '0.5.1');
+  assert.equal(rootPackage.version, '1.0.0');
   assert.equal(appPackage.version, rootPackage.version);
   assert.equal(sitePackage.version, rootPackage.version);
   assert.ok(versionSource.includes(`'${rootPackage.version}'`));
@@ -104,6 +104,12 @@ test('app and reverse proxy enforce the production security-header baseline', ()
   assert.ok(nginx.includes('server_tokens off'));
   assert.ok(nextConfig.includes('poweredByHeader: false'));
   assert.ok(nginx.includes('X-Frame-Options "DENY"'));
+});
+
+test('release handoff documents exist', () => {
+  for (const file of ['RELEASE_STATUS.md', 'docs/LOCAL_TEST.md', 'docs/ACCEPTANCE.md', 'docs/DEPLOYMENT.md']) {
+    assert.ok(fs.existsSync(path.join(root, file)), file);
+  }
 });
 
 test('public homepage still exposes all three conversation modes', () => {
