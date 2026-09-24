@@ -94,6 +94,7 @@ export function validateRepository(rootDir) {
   const required = [
     'deploy/production/livekit.yaml.example',
     'deploy/production/env.production.example',
+    'deploy/production/nginx-tls.conf.example',
     'docs/DEPLOYMENT.md',
     'apps/app/lib/version.ts',
     'apps/app/lib/invite-token.ts',
@@ -118,6 +119,16 @@ export function validateRepository(rootDir) {
   for (const check of ['pnpm test', 'pnpm readiness:template', 'docker compose config', 'pnpm typecheck', 'pnpm build', 'pnpm smoke:runtime']) {
     if (!ci.includes(check)) errors.push(`CI is missing required gate: ${check}`);
   }
+
+  const nextConfig = read('apps/app/next.config.mjs');
+  for (const header of ['Content-Security-Policy', 'Strict-Transport-Security', 'X-Content-Type-Options', 'X-Frame-Options']) {
+    if (!nextConfig.includes(header)) errors.push(`Next.js is missing required security header: ${header}`);
+  }
+  if (!nextConfig.includes('poweredByHeader: false')) errors.push('Next.js must disable the X-Powered-By header.');
+
+  const nginx = read('deploy/nginx.conf');
+  if (!nginx.includes('server_tokens off')) errors.push('Nginx must disable server tokens.');
+  if (!nginx.includes('Content-Security-Policy')) errors.push('Nginx must set Content-Security-Policy.');
 
   const health = read('apps/app/app/api/health/route.ts');
   if (!health.includes('VEYLO_VERSION')) errors.push('Health endpoint must use the centralized VEYLO_VERSION constant.');
