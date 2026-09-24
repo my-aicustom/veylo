@@ -1,4 +1,4 @@
-# VEYLO — v0.4.6
+# VEYLO — v0.4.7
 
 > Working codename. Internal multilingual communication product by MY-AI.
 
@@ -9,7 +9,19 @@ Veylo combines a fast Astro marketing homepage with a self-hosted LiveKit realti
 - **Live Call** — create/join a Veylo video room with listener-side interpretation.
 - **Face-to-Face** — one device acts as interpreter between two people in the same room.
 - **AI Simulation** — practice with an AI counterpart using country, role and scenario context.
-- **Diagnostics** — test browser media, WebRTC, server config, LiveKit reachability, and OpenRouter model availability.
+- **Diagnostics** — test browser media, WebRTC, server config, LiveKit reachability, OpenRouter model availability, and local latency traces.
+
+## v0.4.7 latency telemetry
+
+- measures each Live Call interpretation turn using the browser's monotonic high-resolution clock
+- captures queue delay after phrase capture, STT duration, translation duration, speech queue delay, TTS response time, first streamed chunk, playback start, total TTS duration, and end-to-end time to translated playback
+- shows compact E2E / STT / translation / TTS-start values directly in the Interpreter panel
+- keeps up to 60 recent latency traces in browser localStorage only
+- Diagnostics shows the latest trace, median E2E, median STT, median translation, median TTS-start, and the last eight turns
+- same-language turns are recorded without inventing translation/TTS durations
+- local timing storage is best-effort and never blocks an active call
+
+Telemetry is intentionally local-only in this version. No conversation timing data is uploaded to a separate analytics service.
 
 ## v0.4.6 lower-latency TTS transport
 
@@ -20,18 +32,6 @@ Veylo combines a fast Astro marketing homepage with a self-hosted LiveKit realti
 - the same playback engine is used by Live Call, Face-to-Face, and AI Simulation
 - upstream generation IDs are forwarded when OpenRouter provides them
 - the gateway marks TTS responses with `X-Veylo-TTS-Transport: stream`
-
-OpenRouter documents streaming responses for its speech endpoint. Progressive browser playback is feature-detected because MediaSource support is not universal.
-
-## v0.4.5 diagnostics
-
-- new `/app/diagnostics` page reachable from the app home
-- browser checks for online state, secure context, WebRTC, media APIs, mic/camera permissions, and detected devices
-- server config check exposes only booleans/metadata; secrets are never returned
-- deep OpenRouter check uses `GET /api/v1/models` instead of paid inference
-- selected STT/translation/TTS model IDs are verified against the OpenRouter model catalog
-- LiveKit reachability is tested from the app server with a short timeout
-- diagnostics UI is responsive and designed for local troubleshooting
 
 ## Local development
 
