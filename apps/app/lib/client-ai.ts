@@ -134,7 +134,7 @@ function appendChunk(sourceBuffer: SourceBuffer, chunk: Uint8Array) {
     sourceBuffer.addEventListener('updateend', onEnd, { once: true });
     sourceBuffer.addEventListener('error', onError, { once: true });
     try {
-      sourceBuffer.appendBuffer(chunk);
+      const stableBuffer = new Uint8Array(chunk.byteLength);\n      stableBuffer.set(chunk);\n      sourceBuffer.appendBuffer(stableBuffer.buffer);
     } catch (error) {
       cleanup();
       reject(error);
