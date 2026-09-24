@@ -12,6 +12,7 @@ test('all runtime API routes exist', () => {
     'apps/app/app/api/health/route.ts',
     'apps/app/app/api/invite/route.ts',
     'apps/app/app/api/mediate/route.ts',
+    'apps/app/app/api/ready/route.ts',
     'apps/app/app/api/simulate/route.ts',
     'apps/app/app/api/stt/route.ts',
     'apps/app/app/api/translate/route.ts',
@@ -63,6 +64,23 @@ test('room access has both validation and signed-invite enforcement', () => {
   assert.ok(inviteRoute.includes('createInviteToken'));
   assert.ok(inviteLib.includes('createHmac'));
   assert.ok(inviteLib.includes('timingSafeEqual'));
+});
+
+test('AI routes use the global request budget guard', () => {
+  for (const file of [
+    'apps/app/app/api/stt/route.ts',
+    'apps/app/app/api/translate/route.ts',
+    'apps/app/app/api/tts/route.ts',
+    'apps/app/app/api/simulate/route.ts',
+    'apps/app/app/api/mediate/route.ts',
+  ]) {
+    assert.ok(read(file).includes('guardAiBudget'), file);
+  }
+});
+
+test('runtime readiness and smoke test exist', () => {
+  assert.ok(read('apps/app/app/api/ready/route.ts').includes('ready'));
+  assert.ok(read('scripts/runtime-smoke.mjs').includes('RUNTIME SMOKE PASSED'));
 });
 
 test('reverse proxy includes baseline browser security headers', () => {
