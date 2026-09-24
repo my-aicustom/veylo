@@ -8,6 +8,7 @@ const goodEnv = {
   LIVEKIT_URL: 'wss://rtc.example.com',
   LIVEKIT_API_KEY: 'prod-api-key-123',
   LIVEKIT_API_SECRET: 'a-strong-production-secret-123456',
+  VEYLO_INVITE_SECRET: 'a-random-invite-secret-longer-than-32-characters',
   OPENROUTER_API_KEY: 'sk-or-v1-example-realistic-key',
 };
 
@@ -43,6 +44,17 @@ test('development LiveKit credentials are rejected', () => {
   });
   assert.ok(errors.some((error) => error.includes('LIVEKIT_API_KEY')));
   assert.ok(errors.some((error) => error.includes('LIVEKIT_API_SECRET')));
+});
+
+test('production invite secret is required and must be strong enough', () => {
+  const missing = validateProductionEnv({ ...goodEnv, VEYLO_INVITE_SECRET: '' });
+  assert.ok(missing.some((error) => error.includes('VEYLO_INVITE_SECRET is required')));
+
+  const short = validateProductionEnv({ ...goodEnv, VEYLO_INVITE_SECRET: 'too-short' });
+  assert.ok(short.some((error) => error.includes('at least 32 characters')));
+
+  const placeholder = validateProductionEnv({ ...goodEnv, VEYLO_INVITE_SECRET: 'replace-me-with-a-long-random-invite-secret' });
+  assert.ok(placeholder.some((error) => error.includes('placeholder')));
 });
 
 test('repository production templates satisfy mandatory gates', () => {

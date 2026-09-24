@@ -1,4 +1,4 @@
-# VEYLO — v0.5.0
+# VEYLO — v0.5.1
 
 > Working codename. Internal multilingual communication product by MY-AI.
 
@@ -11,30 +11,26 @@ Veylo combines an Astro marketing homepage, a Next.js realtime application, self
 - **AI Simulation** — practice international conversations with an AI counterpart.
 - **Diagnostics** — browser/media, LiveKit, OpenRouter, deployment and latency troubleshooting.
 
-## v0.5.0 production + QA foundation
+## v0.5.1 signed room invites
 
-- LiveKit Server is pinned to `v1.13.7`; the dev stack no longer follows `:latest`
-- centralized Veylo version used by the health endpoint
-- root/app/site versions synchronized
-- Node-native automated test suite added without adding another test framework dependency
-- CI now gates on tests, production-template readiness, Docker Compose validation, typecheck and production build
-- production preflight rejects insecure URLs, localhost endpoints and development/placeholder credentials
-- production LiveKit template includes public-IP advertisement and TURN/TLS requirements
-- room names are validated before LiveKit token creation
-- reverse proxy adds baseline content/frame/referrer/permissions security headers
-- explicit internal-beta acceptance checklist added
-- production deployment assets and security boundary documented
+- optional in local development, required by production preflight
+- room creation obtains a time-limited HMAC-signed invite token
+- invite token is carried in the shared room URL
+- connection/token endpoint validates the invite before issuing a LiveKit participant token
+- expired, malformed, or room-mismatched invites are rejected
+- signature comparison uses constant-time comparison
+- production invite secret must be at least 32 characters and cannot be a placeholder
+- no account/login flow was added
 
-## Existing realtime capabilities
+## Existing production + QA foundation
 
-- self-hosted LiveKit room/token flow
-- OpenRouter STT, translation, AI simulation/mediation and TTS
-- streaming TTS with progressive playback where supported
-- listener-language correction during a live call
-- transcript persistence/export
-- network/reconnect/audio-playback health
-- local end-to-end latency telemetry and historical diagnostics
-- no user login requirement
+- LiveKit Server pinned to `v1.13.7`
+- automated Node tests
+- CI gates on tests, production readiness, Docker Compose validation, typecheck and production build
+- production WSS/TURN/TLS deployment templates
+- baseline reverse-proxy security headers
+- streaming TTS and local latency telemetry
+- source ZIP artifact generated after successful `main` builds
 
 ## Local development
 
@@ -44,36 +40,13 @@ pnpm install
 pnpm dev
 ```
 
-- Astro site: http://localhost:4321
-- Veylo app: http://localhost:3000/app
-- Diagnostics: http://localhost:3000/app/diagnostics
-- Local LiveKit: ws://localhost:7880
+For local development, `VEYLO_INVITE_SECRET` may stay empty. If you want to test signed links locally, set it to any random value of at least 32 characters.
 
-Full local stack:
-
-```bash
-cp .env.example .env
-# fill OPENROUTER_API_KEY
-docker compose up --build
-```
-
-Open http://localhost:8080.
-
-## Automated verification
-
-```bash
-pnpm audit:static
-pnpm test
-pnpm readiness:template
-pnpm typecheck
-pnpm build
-```
-
-For a real production environment:
+For production:
 
 ```bash
 cp deploy/production/env.production.example .env.production
-# replace placeholders
+# replace every placeholder, including VEYLO_INVITE_SECRET
 pnpm readiness -- --env .env.production
 ```
 
@@ -81,7 +54,7 @@ Then follow `docs/DEPLOYMENT.md` and complete `docs/ACCEPTANCE.md`.
 
 ## Security boundary
 
-`OPENROUTER_API_KEY`, `LIVEKIT_API_SECRET`, and `LIVEKIT_API_KEY` must remain server-side. Veylo intentionally has no user account/login system. See `SECURITY.md` for the current internal-app threat boundary.
+`OPENROUTER_API_KEY`, `LIVEKIT_API_SECRET`, `LIVEKIT_API_KEY`, and `VEYLO_INVITE_SECRET` remain server-side. Veylo intentionally has no user account/login system. See `SECURITY.md`.
 
 ## Foundation
 

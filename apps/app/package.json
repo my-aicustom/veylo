@@ -1,6 +1,6 @@
 {
   "name": "@veylo/app",
-  "version": "0.5.0",
+  "version": "0.5.1",
   "private": true,
   "description": "Veylo realtime multilingual communication app built on self-hosted LiveKit with OpenRouter interpretation.",
   "license": "Apache-2.0",
