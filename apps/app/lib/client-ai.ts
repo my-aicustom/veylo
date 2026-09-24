@@ -1,6 +1,6 @@
 'use client';
 
-import type { Profile, TranscriptTurn } from './types';
+import type { Profile, SpeechPlaybackTiming, TranscriptTurn } from './types';
 import { apiUrl } from './paths';
 
 async function fetchJson<T>(url: string, body: unknown, timeoutMs = 45_000): Promise<T> {
@@ -44,7 +44,7 @@ export function translate(text: string, args: {
   return fetchJson<{ text: string; usage?: any }>(apiUrl('/api/translate'), { text, ...args });
 }
 
-async function requestSpeech(text: string) {
+async function requestSpeech(text: string, startedAt: number) {
   const controller = new AbortController();
   const timer = window.setTimeout(() => controller.abort(), 55_000);
   try {
@@ -58,7 +58,10 @@ async function requestSpeech(text: string) {
       const payload = await response.json().catch(() => ({}));
       throw new Error(payload?.error || `TTS failed ${response.status}`);
     }
-    return response;
+    return {
+      response,
+      responseMs: performance.now() - startedAt,
+    };
   } finally {
     window.clearTimeout(timer);
   }
@@ -83,13 +86,25 @@ function waitForAudioEnd(audio: HTMLAudioElement) {
   });
 }
 
-async function playBuffered(response: Response) {
+async function playBuffered(
+  response: Response,
+  startedAt: number,
+  responseMs: number,
+): Promise<SpeechPlaybackTiming> {
   const blob = await response.blob();
   const url = URL.createObjectURL(blob);
   const audio = new Audio(url);
+  let playbackStartMs = performance.now() - startedAt;
   try {
     await audio.play();
+    playbackStartMs = performance.now() - startedAt;
     await waitForAudioEnd(audio);
+    return {
+      mode: 'buffered',
+      responseMs,
+      playbackStartMs,
+      totalMs: performance.now() - startedAt,
+    };
   } finally {
     audio.pause();
     audio.removeAttribute('src');
@@ -144,13 +159,20 @@ function appendChunk(sourceBuffer: SourceBuffer, chunk: Uint8Array) {
   });
 }
 
-async function playProgressive(response: Response, contentType: string) {
+async function playProgressive(
+  response: Response,
+  contentType: string,
+  startedAt: number,
+  responseMs: number,
+): Promise<SpeechPlaybackTiming> {
   if (!response.body) throw new Error('TTS response has no stream body');
 
   const mediaSource = new MediaSource();
   const objectUrl = URL.createObjectURL(mediaSource);
   const audio = new Audio(objectUrl);
   let playbackStarted = false;
+  let playbackStartMs = 0;
+  let firstChunkMs: number | undefined;
 
   try {
     await waitForSourceOpen(mediaSource);
@@ -164,9 +186,11 @@ async function playProgressive(response: Response, contentType: string) {
         if (done) break;
         if (!value?.byteLength) continue;
 
+        if (firstChunkMs === undefined) firstChunkMs = performance.now() - startedAt;
         await appendChunk(sourceBuffer, value);
         if (!playbackStarted) {
           await audio.play();
+          playbackStartMs = performance.now() - startedAt;
           playbackStarted = true;
         }
       }
@@ -183,9 +207,18 @@ async function playProgressive(response: Response, contentType: string) {
 
     if (!playbackStarted) {
       await audio.play();
+      playbackStartMs = performance.now() - startedAt;
       playbackStarted = true;
     }
     await waitForAudioEnd(audio);
+
+    return {
+      mode: 'progressive',
+      responseMs,
+      firstChunkMs,
+      playbackStartMs,
+      totalMs: performance.now() - startedAt,
+    };
   } finally {
     audio.pause();
     audio.removeAttribute('src');
@@ -196,8 +229,9 @@ async function playProgressive(response: Response, contentType: string) {
   }
 }
 
-export async function playSpeech(text: string) {
-  const response = await requestSpeech(text);
+export async function playSpeech(text: string): Promise<SpeechPlaybackTiming> {
+  const startedAt = performance.now();
+  const { response, responseMs } = await requestSpeech(text, startedAt);
   const contentType = (response.headers.get('content-type') || 'audio/mpeg').split(';')[0].trim();
 
   const progressive =
@@ -207,9 +241,9 @@ export async function playSpeech(text: string) {
     MediaSource.isTypeSupported(contentType);
 
   if (progressive) {
-    return playProgressive(response, contentType);
+    return playProgressive(response, contentType, startedAt, responseMs);
   }
-  return playBuffered(response);
+  return playBuffered(response, startedAt, responseMs);
 }
 
 export function simulate(input: {

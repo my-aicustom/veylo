@@ -7,6 +7,11 @@ import { downloadTranscript } from '@/lib/transcript-export';
 import { ALL_LANGUAGE_CODES } from '@/lib/countries';
 import type { Profile } from '@/lib/types';
 
+function formatLatency(value?: number) {
+  if (value === undefined || !Number.isFinite(value)) return '—';
+  return value >= 1000 ? `${(value / 1000).toFixed(2)}s` : `${Math.round(value)}ms`;
+}
+
 export function InterpreterPanel({
   room,
   profile,
@@ -44,7 +49,7 @@ export function InterpreterPanel({
     }
   }, []);
 
-  const { turns, status, mediatorNote, clear } = useRemoteInterpreter(room, profile, enabled, {
+  const { turns, status, mediatorNote, latestLatency, clear } = useRemoteInterpreter(room, profile, enabled, {
     targetLanguage,
     sessionId: `live:${roomName}`,
   });
@@ -97,6 +102,19 @@ export function InterpreterPanel({
               <p className="empty-caption">Translation appears here when another participant speaks.</p>
             )}
           </div>
+
+          {latestLatency && (
+            <div
+              className="latency-strip"
+              title="Local browser timing from phrase capture through AI speech playback"
+            >
+              <span><b>E2E</b>{formatLatency(latestLatency.endToEndPlaybackMs ?? latestLatency.totalTurnMs)}</span>
+              <span><b>STT</b>{formatLatency(latestLatency.sttMs)}</span>
+              <span><b>TR</b>{formatLatency(latestLatency.translateMs)}</span>
+              <span><b>TTS</b>{formatLatency(latestLatency.ttsPlaybackStartMs)}</span>
+              <em>{latestLatency.playbackMode}</em>
+            </div>
+          )}
 
           {mediatorNote && <div className="mediator-note"><span>AI Mediator</span><p>{mediatorNote}</p></div>}
 

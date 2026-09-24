@@ -22,6 +22,33 @@ export interface TranscriptTurn {
   targetLanguage: string;
 }
 
+export interface SpeechPlaybackTiming {
+  mode: 'progressive' | 'buffered';
+  responseMs: number;
+  firstChunkMs?: number;
+  playbackStartMs: number;
+  totalMs: number;
+}
+
+export interface LatencyTrace {
+  id: string;
+  at: string;
+  participantName?: string;
+  sourceLanguage?: string;
+  targetLanguage: string;
+  captureQueueMs: number;
+  sttMs: number;
+  translateMs?: number;
+  speechQueueMs?: number;
+  ttsResponseMs?: number;
+  ttsFirstChunkMs?: number;
+  ttsPlaybackStartMs?: number;
+  ttsTotalMs?: number;
+  endToEndPlaybackMs?: number;
+  totalTurnMs: number;
+  playbackMode: 'progressive' | 'buffered' | 'none';
+}
+
 export interface ConnectionDetails {
   serverUrl: string;
   roomName: string;

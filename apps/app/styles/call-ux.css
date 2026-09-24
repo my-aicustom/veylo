@@ -41,6 +41,20 @@
 .call-health[data-state="danger"] { color:#ffb2b2; border-color:rgba(246,109,109,.42); }
 .call-health[data-state="danger"] .health-dot { background:var(--danger); }
 
+.latency-strip {
+  display:grid;
+  grid-template-columns:repeat(4,minmax(0,1fr)) auto;
+  gap:8px;
+  align-items:center;
+  padding:9px 15px;
+  border-top:1px solid var(--line);
+  border-bottom:1px solid var(--line);
+  background:#0e0f10;
+}
+.latency-strip span { display:flex; flex-direction:column; gap:2px; min-width:0; font-size:11px; color:#d9dbdd; }
+.latency-strip b { color:var(--soft); font-size:9px; letter-spacing:.08em; font-weight:650; }
+.latency-strip em { justify-self:end; color:var(--accent); font-size:9px; font-style:normal; text-transform:uppercase; letter-spacing:.08em; }
+
 .transcript-actions { display: flex; gap: 14px; align-items: center; padding: 12px 15px 14px; border-top: 1px solid var(--line); }
 .transcript-actions .text-button { margin: 0; }
 .transcript-actions .text-button:first-child { color: var(--text); }
@@ -93,6 +107,8 @@
   .call-health { min-height:28px; padding-inline:8px; }
   .call-health:not(.call-health-action) { max-width:32px; overflow:hidden; color:transparent; gap:0; }
   .call-health:not(.call-health-action) .health-dot { flex:0 0 auto; }
+  .latency-strip { grid-template-columns:repeat(4,minmax(0,1fr)); }
+  .latency-strip em { display:none; }
   .transcript-card-head { align-items:flex-start; }
   .transcript-card-actions { flex-wrap:wrap; justify-content:flex-end; }
 }
