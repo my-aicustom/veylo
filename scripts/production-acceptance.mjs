@@ -29,6 +29,7 @@ function parseArgs(argv) {
 
   for (let index = 0; index < argv.length; index += 1) {
     const arg = argv[index];
+    if (arg === '--') continue;
     if (arg === '--url') options.url = argv[++index] || '';
     else if (arg === '--base-path') options.basePath = argv[++index] || '';
     else if (arg === '--deep') options.deep = true;
