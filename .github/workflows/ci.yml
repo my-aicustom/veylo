@@ -29,6 +29,7 @@ jobs:
           docker compose config >/dev/null
       - run: pnpm typecheck
       - run: pnpm build
+      - run: pnpm smoke:runtime
 
       - name: Package tracked source
         if: github.event_name == 'push' && github.ref == 'refs/heads/main'
