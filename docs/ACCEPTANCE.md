@@ -1,98 +1,96 @@
-# Veylo internal-beta acceptance checklist
+# Veylo v1.0.0 environment acceptance checklist
 
-This checklist defines when a build can be treated as an internal production candidate. Automated CI can prove repository integrity; device/network behaviour must still be verified physically.
+The repository gate is automated. This checklist is for the real VPS, browser, device, and network environment.
 
-## A. Automated repository gates
+## A. Automated repository gate
 
-All must pass:
+The CI release gate must be green for all of:
 
-- [ ] `pnpm install --frozen-lockfile`
-- [ ] `pnpm audit:static`
-- [ ] `pnpm test`
-- [ ] `pnpm readiness:template`
-- [ ] `docker compose config`
-- [ ] `pnpm typecheck`
-- [ ] `pnpm build`
+- [x] frozen dependency install
+- [x] static project audit
+- [x] automated Node tests
+- [x] production-template readiness
+- [x] Docker Compose validation
+- [x] TypeScript typecheck
+- [x] Astro + Next.js production build
+- [x] built-runtime smoke test
+- [x] signed invite runtime verification
+- [x] runtime security-header verification
+
+A `main` release artifact is produced only after this gate.
 
 ## B. Production configuration
 
-- [ ] `pnpm readiness -- --env .env.production` passes
+- [ ] `pnpm readiness -- --env .env.production` passes using the actual environment
+- [ ] `/app/api/ready` returns HTTP 200 after deployment
 - [ ] public app URL uses trusted HTTPS
-- [ ] LiveKit URL uses public `wss://`
+- [ ] LiveKit URL uses trusted public `wss://`
 - [ ] LiveKit advertises the correct public IP
 - [ ] TURN/TLS is reachable from a restrictive network
-- [ ] development LiveKit credentials are not used
-- [ ] OpenRouter key is server-side only
-- [ ] LiveKit image version is explicitly pinned
+- [ ] development credentials are absent
+- [ ] OpenRouter provider-side spend controls are configured to your preferred limit
+- [ ] DNS/cert renewal is operational
 
-## C. Core product flows
+## C. Live Call
 
-### Live Call
-
-- [ ] user can create a room
-- [ ] second device can join using shared link
-- [ ] camera/microphone permission flow is understandable
-- [ ] both participants can see/hear each other
+- [ ] create room returns a signed invite URL
+- [ ] URL without/tampered invite is denied in strict production
+- [ ] second device joins with the valid shared link
+- [ ] both participants see/hear each other
 - [ ] remote speech is transcribed
-- [ ] translation appears in the selected listener language
+- [ ] translation appears in each selected listener language
 - [ ] translated TTS plays
-- [ ] original audio is restored after TTS/failure
-- [ ] same-language speech is not unnecessarily translated/ducked
-- [ ] target language can be changed during the call
-- [ ] transcript survives accidental refresh on the same browser
-- [ ] transcript export works
+- [ ] original audio recovers after TTS/provider failure
+- [ ] target language changes during the call
+- [ ] transcript persists locally and exports
 
-### Face-to-Face
+## D. Face-to-Face
 
-- [ ] microphone starts/stops cleanly
-- [ ] speaker side is inferred acceptably
+- [ ] microphone start/stop works
 - [ ] both translation directions work
-- [ ] TTS does not feed back continuously into the recorder
-- [ ] transcript export/restore works
+- [ ] TTS does not create an uncontrolled feedback loop
+- [ ] transcript restore/export works
 
-### AI Simulation
+## E. AI Simulation
 
-- [ ] role/country/scenario context changes behaviour
-- [ ] spoken user turn is transcribed
-- [ ] AI counterpart responds
-- [ ] AI voice plays
-- [ ] listener-language subtitle appears when required
+- [ ] country/role/scenario affects AI counterpart behaviour
+- [ ] spoken user input transcribes
+- [ ] AI reply renders and speaks
+- [ ] translated listener subtitle appears when needed
 
-## D. Device/browser matrix
+## F. Device/browser matrix
 
-At minimum:
+Minimum:
 
 - [ ] Windows Chrome or Edge
 - [ ] Android Chrome
 - [ ] iPhone Safari
 - [ ] two-device call across different networks
 
-Recommended additional coverage:
+Recommended:
 
 - [ ] macOS Safari
 - [ ] Bluetooth headset
-- [ ] laptop speaker + built-in microphone
+- [ ] laptop built-in mic/speaker
 - [ ] mobile speakerphone
 
-## E. Network resilience
+## G. Network resilience
 
 - [ ] stable broadband/Wi-Fi
 - [ ] mobile hotspot or 4G/5G
-- [ ] Wi-Fi disabled and re-enabled during call
-- [ ] LiveKit UI shows reconnect/offline state correctly
-- [ ] audio returns after reconnect
-- [ ] restrictive office/event Wi-Fi successfully falls back through TURN
+- [ ] Wi-Fi disabled/re-enabled mid-call
+- [ ] reconnect state is visible and audio returns
+- [ ] restrictive office/event Wi-Fi succeeds through TURN
 
-## F. AI and latency quality
+## H. AI/latency acceptance
 
-Use `/app/diagnostics` after a translated call.
+Use `/app/diagnostics` after real translated calls:
 
-Internal targets for a stable network (targets, not protocol guarantees):
+- [ ] median E2E translated-audio start is acceptable for your conversation style
+- [ ] no unexpected dominant pipeline stage
+- [ ] Indonesian/English STT is acceptable
+- [ ] required target languages are acceptable
+- [ ] names, numbers, currencies, and trade terminology are preserved
+- [ ] OpenRouter failures degrade interpretation without killing the call
 
-- [ ] median translated-audio E2E start is acceptable for natural conversation
-- [ ] no single pipeline stage dominates unexpectedly without being visible in telemetry
-- [ ] STT handles Indonesian and English clearly
-- [ ] names, numbers, currencies and trade terminology are preserved acceptably
-- [ ] failure of STT/translation/TTS does not kill the call itself
-
-Do not mark the build fully accepted until the physical device/network sections above have been completed.
+Environment acceptance is complete only after the unchecked physical/deployment items above are verified.
