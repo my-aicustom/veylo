@@ -10,7 +10,7 @@ function present(value) {
 function devLike(value) {
   if (!present(value)) return false;
   const normalized = value.trim().toLowerCase();
-  return DEV_VALUES.has(normalized) || normalized.includes('change_me') || normalized.includes('replace_me');
+  return DEV_VALUES.has(normalized) || normalized.includes('change_me') || normalized.includes('change-me') || normalized.includes('replace_me') || normalized.includes('replace-me');
 }
 
 function parseUrl(value) {
