@@ -17,7 +17,8 @@
     "audit:static": "node scripts/project-audit.mjs",
     "test": "node --test tests/*.test.mjs",
     "readiness": "node scripts/production-readiness.mjs",
-    "readiness:template": "node scripts/production-readiness.mjs --template"
+    "readiness:template": "node scripts/production-readiness.mjs --template",
+    "smoke:runtime": "node scripts/runtime-smoke.mjs"
   },
   "devDependencies": {
     "concurrently": "^9.2.1"
