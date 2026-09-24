@@ -10,6 +10,7 @@ test('all runtime API routes exist', () => {
   const routes = [
     'apps/app/app/api/connection-details/route.ts',
     'apps/app/app/api/health/route.ts',
+    'apps/app/app/api/invite/route.ts',
     'apps/app/app/api/mediate/route.ts',
     'apps/app/app/api/simulate/route.ts',
     'apps/app/app/api/stt/route.ts',
@@ -38,7 +39,7 @@ test('workspace, app, site, and health version stay synchronized', () => {
   const sitePackage = JSON.parse(read('apps/site/package.json'));
   const versionSource = read('apps/app/lib/version.ts');
 
-  assert.equal(rootPackage.version, '0.5.0');
+  assert.equal(rootPackage.version, '0.5.1');
   assert.equal(appPackage.version, rootPackage.version);
   assert.equal(sitePackage.version, rootPackage.version);
   assert.ok(versionSource.includes(`'${rootPackage.version}'`));
@@ -51,10 +52,17 @@ test('LiveKit runtime image is pinned', () => {
   assert.equal(compose.includes('livekit/livekit-server:latest'), false);
 });
 
-test('room token endpoint validates room names', () => {
+test('room access has both validation and signed-invite enforcement', () => {
   const route = read('apps/app/app/api/connection-details/route.ts');
+  const inviteRoute = read('apps/app/app/api/invite/route.ts');
+  const inviteLib = read('apps/app/lib/invite-token.ts');
+
   assert.ok(route.includes('ROOM_PATTERN'));
-  assert.ok(route.includes('Invalid room name'));
+  assert.ok(route.includes('verifyInviteToken'));
+  assert.ok(route.includes('A valid Veylo invite link is required'));
+  assert.ok(inviteRoute.includes('createInviteToken'));
+  assert.ok(inviteLib.includes('createHmac'));
+  assert.ok(inviteLib.includes('timingSafeEqual'));
 });
 
 test('reverse proxy includes baseline browser security headers', () => {
