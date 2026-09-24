@@ -40,9 +40,9 @@ jobs:
         run: |
           mkdir -p ui-review
           (pnpm --filter @veylo/app start --hostname 127.0.0.1 --port 3100 > ui-review/app.log 2>&1 &)
-          (pnpm --filter @veylo/site preview --host 127.0.0.1 --port 4322 > ui-review/site.log 2>&1 &)
+          (pnpm --filter @veylo/site preview > ui-review/site.log 2>&1 &)
           for i in {1..30}; do
-            if curl -fsS http://127.0.0.1:3100/app >/dev/null && curl -fsS http://127.0.0.1:4322 >/dev/null; then
+            if curl -fsS http://127.0.0.1:3100/app >/dev/null && curl -fsS http://127.0.0.1:4321 >/dev/null; then
               exit 0
             fi
             sleep 1
@@ -56,8 +56,8 @@ jobs:
         run: |
           CHROME="$(command -v google-chrome || command -v chromium || command -v chromium-browser)"
           test -n "$CHROME"
-          "$CHROME" --headless --no-sandbox --disable-gpu --hide-scrollbars --window-size=1440,1000 --screenshot=ui-review/site-desktop.png http://127.0.0.1:4322/
-          "$CHROME" --headless --no-sandbox --disable-gpu --hide-scrollbars --window-size=390,844 --screenshot=ui-review/site-mobile.png http://127.0.0.1:4322/
+          "$CHROME" --headless --no-sandbox --disable-gpu --hide-scrollbars --window-size=1440,1000 --screenshot=ui-review/site-desktop.png http://127.0.0.1:4321/
+          "$CHROME" --headless --no-sandbox --disable-gpu --hide-scrollbars --window-size=390,844 --screenshot=ui-review/site-mobile.png http://127.0.0.1:4321/
           "$CHROME" --headless --no-sandbox --disable-gpu --hide-scrollbars --window-size=1440,1000 --screenshot=ui-review/app-onboarding-desktop.png http://127.0.0.1:3100/app
           "$CHROME" --headless --no-sandbox --disable-gpu --hide-scrollbars --window-size=390,844 --screenshot=ui-review/app-onboarding-mobile.png http://127.0.0.1:3100/app
           "$CHROME" --headless --no-sandbox --disable-gpu --hide-scrollbars --window-size=1440,1000 --screenshot=ui-review/face-to-face-desktop.png http://127.0.0.1:3100/app/face-to-face
@@ -65,7 +65,7 @@ jobs:
 
       - name: Lighthouse public site
         run: |
-          npx --yes lighthouse@13.5.0 http://127.0.0.1:4322/             --chrome-flags="--headless --no-sandbox --disable-gpu"             --only-categories=performance,accessibility,best-practices,seo             --output=json --output=html --output-path=ui-review/site-lighthouse
+          npx --yes lighthouse@13.5.0 http://127.0.0.1:4321/             --chrome-flags="--headless --no-sandbox --disable-gpu"             --only-categories=performance,accessibility,best-practices,seo             --output=json --output=html --output-path=ui-review/site-lighthouse
 
       - name: Lighthouse app onboarding
         run: |
