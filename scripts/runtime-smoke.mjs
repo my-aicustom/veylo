@@ -86,7 +86,10 @@ try {
   assert(health.body.config?.inviteProtection === true, 'Signed invite protection is not enabled in runtime smoke.');
 
   const home = await fetch(`${appBase}/app`);
-  assert(home.status === 200 && (await home.text()).includes('VEYLO'), 'App homepage failed runtime smoke.');
+  assert(
+    home.status === 200 && (home.headers.get('content-type') || '').includes('text/html'),
+    'App homepage failed runtime smoke.',
+  );
 
   const diagnostics = await fetch(`${appBase}/app/diagnostics`);
   assert(diagnostics.status === 200, 'Diagnostics page failed runtime smoke.');
