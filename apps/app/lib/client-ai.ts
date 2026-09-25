@@ -89,6 +89,8 @@ async function requestSpeech(text: string, startedAt: number) {
 }
 
 function waitForAudioEnd(audio: HTMLAudioElement) {
+  if (audio.ended) return Promise.resolve();
+  if (audio.error) return Promise.reject(new Error('Audio playback failed'));
   return new Promise<void>((resolve, reject) => {
     const cleanup = () => {
       audio.removeEventListener('ended', onEnded);
@@ -146,7 +148,12 @@ async function playBuffered(
 function waitForSourceOpen(mediaSource: MediaSource) {
   if (mediaSource.readyState === 'open') return Promise.resolve();
   return new Promise<void>((resolve, reject) => {
+    const timer = window.setTimeout(() => {
+      cleanup();
+      reject(new Error('MediaSource did not open'));
+    }, 5_000);
     const cleanup = () => {
+      window.clearTimeout(timer);
       mediaSource.removeEventListener('sourceopen', onOpen);
       mediaSource.removeEventListener('sourceclose', onClose);
     };
@@ -203,7 +210,8 @@ async function playProgressive(
   const objectUrl = URL.createObjectURL(mediaSource);
   const audio = new Audio(objectUrl);
   await applyAudioOutput(audio, outputDeviceId);
-  let playbackStarted = false;
+  let playbackPromise: Promise<void> | undefined;
+  let playbackError: unknown;
   let playbackStartMs = 0;
   let firstChunkMs: number | undefined;
 
@@ -221,10 +229,11 @@ async function playProgressive(
 
         if (firstChunkMs === undefined) firstChunkMs = performance.now() - startedAt;
         await appendChunk(sourceBuffer, value);
-        if (!playbackStarted) {
-          await audio.play();
-          playbackStartMs = performance.now() - startedAt;
-          playbackStarted = true;
+        if (!playbackPromise) {
+          playbackPromise = audio.play().then(
+            () => { playbackStartMs = performance.now() - startedAt; },
+            (error) => { playbackError = error; },
+          );
         }
       }
     } finally {
@@ -238,11 +247,14 @@ async function playProgressive(
     }
     if (mediaSource.readyState === 'open') mediaSource.endOfStream();
 
-    if (!playbackStarted) {
-      await audio.play();
-      playbackStartMs = performance.now() - startedAt;
-      playbackStarted = true;
+    if (!playbackPromise) {
+      playbackPromise = audio.play().then(
+        () => { playbackStartMs = performance.now() - startedAt; },
+        (error) => { playbackError = error; },
+      );
     }
+    await playbackPromise;
+    if (playbackError) throw playbackError;
     await waitForAudioEnd(audio);
 
     return {
@@ -274,7 +286,13 @@ export async function playSpeech(text: string, outputDeviceId?: string): Promise
     MediaSource.isTypeSupported(contentType);
 
   if (progressive) {
-    return playProgressive(response, contentType, startedAt, responseMs, outputDeviceId);
+    try {
+      return await playProgressive(response, contentType, startedAt, responseMs, outputDeviceId);
+    } catch (error) {
+      console.warn('[speech] Progressive playback failed; retrying buffered audio', error);
+      const retry = await requestSpeech(text, startedAt);
+      return playBuffered(retry.response, startedAt, retry.responseMs, outputDeviceId);
+    }
   }
   return playBuffered(response, startedAt, responseMs, outputDeviceId);
 }

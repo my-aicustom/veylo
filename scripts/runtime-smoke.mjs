@@ -1,7 +1,7 @@
 import { spawn } from 'node:child_process';
+import { resolve } from 'node:path';
 import process from 'node:process';
 
-const pnpm = process.platform === 'win32' ? 'pnpm.cmd' : 'pnpm';
 const appBase = 'http://127.0.0.1:3100';
 const siteBase = 'http://127.0.0.1:4322';
 
@@ -9,9 +9,9 @@ function assert(condition, message) {
   if (!condition) throw new Error(message);
 }
 
-function start(args, env = {}) {
-  const child = spawn(pnpm, args, {
-    cwd: process.cwd(),
+function start(script, args, env = {}, workingDirectory = '.') {
+  const child = spawn(process.execPath, [resolve(script), ...args], {
+    cwd: resolve(workingDirectory),
     env: { ...process.env, ...env },
     stdio: ['ignore', 'pipe', 'pipe'],
   });
@@ -61,7 +61,8 @@ let site;
 
 try {
   app = start(
-    ['--filter', '@veylo/app', 'exec', 'next', 'start', '-H', '127.0.0.1', '-p', '3100'],
+    'apps/app/node_modules/next/dist/bin/next',
+    ['start', '-H', '127.0.0.1', '-p', '3100'],
     {
       APP_URL: appBase,
       NEXT_PUBLIC_BASE_PATH: '/app',
@@ -74,6 +75,7 @@ try {
       VEYLO_AI_MAX_REQUESTS_PER_HOUR: '100',
       VEYLO_AI_MAX_TRACKED_COST_USD_PER_DAY: '5',
     },
+    'apps/app',
   );
 
   await waitFor(`${appBase}/app/api/ready`, app);
@@ -144,7 +146,7 @@ try {
   await stop(app);
   app = null;
 
-  site = start(['--filter', '@veylo/site', 'exec', 'astro', 'preview', '--host', '127.0.0.1', '--port', '4322']);
+  site = start('apps/site/node_modules/astro/bin/astro.mjs', ['preview', '--host', '127.0.0.1', '--port', '4322'], {}, 'apps/site');
   const siteResponse = await waitFor(siteBase, site);
   const siteHtml = await siteResponse.text();
   assert(siteResponse.status === 200 && siteHtml.toUpperCase().includes('VEYLO'), 'Astro homepage failed runtime smoke.');

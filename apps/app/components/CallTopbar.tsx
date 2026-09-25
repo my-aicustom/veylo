@@ -4,6 +4,7 @@ import * as React from 'react';
 import { useParticipants } from '@livekit/components-react';
 import type { Room } from 'livekit-client';
 import { CallHealth } from './CallHealth';
+import { BrandMark } from './BrandMark';
 
 export function CallTopbar({ room, roomName }: { room: Room; roomName: string }) {
   const participants = useParticipants({ room });
@@ -41,7 +42,7 @@ export function CallTopbar({ room, roomName }: { room: Room; roomName: string })
 
   return (
     <div className="call-topbar">
-      <div className="call-brand"><strong>VEYLO</strong><span>Live Interpreter</span></div>
+      <div className="call-brand"><BrandMark /><span>Live Interpreter</span></div>
 
       <div className="call-presence" aria-label={`${participants.length} participants in room`}>
         <span className="presence-dot" aria-hidden="true" />

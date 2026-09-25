@@ -4,7 +4,7 @@
   align-items: center;
   gap: 16px;
 }
-.call-brand { display: flex; gap: 10px; align-items: baseline; }
+.call-brand { display: flex; gap: 10px; align-items: center; }
 .call-brand span { color: var(--muted); font-size: 12px; }
 .call-presence { display: inline-flex; align-items: center; gap: 7px; color: var(--muted); font-size: 12px; white-space: nowrap; }
 .presence-dot { width: 7px; height: 7px; border-radius: 999px; background: var(--accent); box-shadow: 0 0 0 4px rgba(217,255,99,.08); }

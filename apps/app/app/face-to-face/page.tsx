@@ -2,9 +2,12 @@
 
 import * as React from 'react';
 import { useRouter } from 'next/navigation';
-import { ALL_LANGUAGE_CODES, COUNTRIES, COUNTRY_LANGUAGE_HINTS, normalizeDetectedLanguage } from '@/lib/countries';
+import { COUNTRY_LANGUAGE_HINTS, normalizeDetectedLanguage } from '@/lib/countries';
+import { CountryPicker } from '@/components/CountryPicker';
+import { LanguagePicker } from '@/components/LanguagePicker';
 import { countryName, defaultLanguage, loadProfile } from '@/lib/profile';
 import { PhraseRecorder } from '@/lib/wav-recorder';
+import { isRecentSpeechEcho } from '@/lib/echo-guard';
 import { analyzeMeeting, playSpeech, transcribe, translate } from '@/lib/client-ai';
 import { downloadTranscript } from '@/lib/transcript-export';
 import { clearTranscript, loadTranscript, saveTranscript, trimTranscript } from '@/lib/transcript-persistence';
@@ -42,10 +45,17 @@ export default function FaceToFacePage() {
   const [reportError, setReportError] = React.useState('');
   const [glossaryInput, setGlossaryInput] = React.useState('');
   const [speakerMode, setSpeakerMode] = React.useState<'auto' | 'you' | 'other'>('auto');
+  const [captureMode, setCaptureMode] = React.useState<'auto' | 'tap'>('auto');
+  const [talkingSide, setTalkingSide] = React.useState<'you' | 'other' | null>(null);
   const recorderRef = React.useRef<PhraseRecorder | null>(null);
   const queueRef = React.useRef<Promise<void>>(Promise.resolve());
   const lastSide = React.useRef<'you' | 'other'>('other');
   const alive = React.useRef(false);
+  const isPlayingAudioRef = React.useRef(false);
+  const recentSpokenTexts = React.useRef<{ text: string; at: number }[]>([]);
+  const sessionRef = React.useRef(0);
+  const playbackRef = React.useRef<Promise<void> | null>(null);
+  const heldSide = React.useRef<'you' | 'other' | null>(null);
 
   const refreshDevices = React.useCallback(async () => {
     try {
@@ -108,22 +118,38 @@ export default function FaceToFacePage() {
   }
 
   async function play(text: string) {
-    recorderRef.current?.pause();
+    const recorder = recorderRef.current;
+    const session = sessionRef.current;
+    isPlayingAudioRef.current = true;
+    recorder?.pause();
     try {
       await playSpeech(text, outputDeviceId);
     } finally {
-      if (alive.current) recorderRef.current?.resume();
+      recentSpokenTexts.current = [...recentSpokenTexts.current.slice(-4), { text, at: Date.now() }];
+      await new Promise((resolve) => window.setTimeout(resolve, 850));
+      recorder?.reset();
+      if (sessionRef.current === session) {
+        isPlayingAudioRef.current = false;
+        if (alive.current && recorderRef.current === recorder && captureMode === 'auto') recorder?.resume();
+      }
     }
   }
 
-  async function process(bytes: Uint8Array) {
-    if (!profile || !alive.current) return;
+  async function process(bytes: Uint8Array, forcedSide?: 'you' | 'other') {
+    const session = sessionRef.current;
+    if (!profile || !alive.current || isPlayingAudioRef.current) return;
     setStatus('Understanding…');
     const stt = await transcribe(bytes);
     const sourceText = stt.text.trim();
-    if (!sourceText || !alive.current) return;
+    if (!sourceText || !alive.current || sessionRef.current !== session || isPlayingAudioRef.current) return;
+
+    if (isRecentSpeechEcho(sourceText, recentSpokenTexts.current)) {
+      console.warn('[face-to-face] Ignored acoustic echo of AI playback:', sourceText);
+      if (alive.current) setStatus('Listening');
+      return;
+    }
     const detected = normalizeDetectedLanguage(stt.language);
-    const side = inferSide(detected);
+    const side = forcedSide || inferSide(detected);
     lastSide.current = side;
     const targetLanguage = side === 'you' ? otherLanguage : profile.preferredLanguage;
     const isSameLanguage = Boolean(detected && detected.toLowerCase() === targetLanguage.toLowerCase());
@@ -143,7 +169,7 @@ export default function FaceToFacePage() {
         console.warn('[face-to-face] translation failed; preserving source transcript', error);
       }
     }
-    if (!alive.current) return;
+    if (!alive.current || sessionRef.current !== session) return;
     const turn: TranscriptTurn = {
       id: crypto.randomUUID(),
       at: new Date().toISOString(),
@@ -157,17 +183,24 @@ export default function FaceToFacePage() {
     commitTurns((current) => [...current, turn]);
     if (!isSameLanguage && translationState !== 'failed') {
       setStatus('Speaking translation…');
-      await play(result.text);
+      const playback = play(result.text);
+      playbackRef.current = playback.then(() => {}, () => {});
+      await playback;
     } else if (translationState === 'failed') {
       setStatus('Translation temporarily unavailable · transcript preserved');
     }
-    if (alive.current) setStatus('Listening');
+    if (alive.current && sessionRef.current === session) setStatus('Listening');
   }
 
   async function start() {
     if (!profile) return;
+    const session = ++sessionRef.current;
+    let stream: MediaStream | undefined;
     try {
-      const stream = await navigator.mediaDevices.getUserMedia({
+      if (playbackRef.current) await playbackRef.current;
+      if (sessionRef.current !== session) return;
+      isPlayingAudioRef.current = false;
+      stream = await navigator.mediaDevices.getUserMedia({
         audio: {
           ...(inputDeviceId !== 'default' ? { deviceId: { exact: inputDeviceId } } : {}),
           echoCancellation: true,
@@ -175,6 +208,7 @@ export default function FaceToFacePage() {
           autoGainControl: true,
         },
       });
+      if (sessionRef.current !== session) { stream.getTracks().forEach((track) => track.stop()); return; }
       await refreshDevices();
       alive.current = true;
       queueRef.current = Promise.resolve();
@@ -184,7 +218,11 @@ export default function FaceToFacePage() {
         maxPhraseMs: 5000,
         threshold: 0.015,
         onPhrase: (phrase) => {
-          queueRef.current = queueRef.current.then(() => process(phrase.bytes)).catch((error) => {
+          if (sessionRef.current !== session) return;
+          const side = captureMode === 'tap' ? heldSide.current : undefined;
+          if (captureMode === 'tap' && !side) return;
+          if (isPlayingAudioRef.current) return;
+          queueRef.current = queueRef.current.then(() => process(phrase.bytes, side || undefined)).catch((error) => {
             console.warn(error);
             setStatus('AI error · original conversation can continue');
           });
@@ -192,20 +230,44 @@ export default function FaceToFacePage() {
       });
       recorderRef.current = recorder;
       await recorder.start();
+      if (sessionRef.current !== session) { recorder.stop(); return; }
+      if (captureMode === 'tap') recorder.pause();
       setRunning(true);
-      setStatus('Listening · language auto-detect on');
+      setStatus(captureMode === 'tap' ? 'Hold a speaker button to talk' : 'Listening · language auto-detect on');
     } catch (error) {
+      if (sessionRef.current !== session) return;
+      recorderRef.current?.stop();
+      recorderRef.current = null;
+      stream?.getTracks().forEach((track) => track.stop());
       alive.current = false;
       setStatus(error instanceof Error ? error.message : 'Could not start microphone');
     }
   }
 
   function stop() {
+    sessionRef.current += 1;
+    heldSide.current = null;
+    setTalkingSide(null);
     alive.current = false;
     recorderRef.current?.stop();
     recorderRef.current = null;
     setRunning(false);
     setStatus('Stopped');
+  }
+
+  function beginTap(side: 'you' | 'other') {
+    if (!alive.current || isPlayingAudioRef.current || heldSide.current) return;
+    heldSide.current = side;
+    setTalkingSide(side);
+    recorderRef.current?.resume();
+  }
+
+  function endTap() {
+    if (!heldSide.current) return;
+    recorderRef.current?.flush();
+    recorderRef.current?.pause();
+    heldSide.current = null;
+    setTalkingSide(null);
   }
 
   async function generateReport() {
@@ -251,29 +313,36 @@ export default function FaceToFacePage() {
       </header>
 
       <section className="tool-grid">
-        <div className="setup-card">
+        <div className="setup-card face-setup">
           <div className="eyebrow">ONE DEVICE / TWO PEOPLE</div>
           <h1>{profile.name} ↔ {otherName}</h1>
+          <p className="setup-intro">Set who you are talking to. Veylo translates each turn aloud.</p>
           <div className="field-grid">
             <label><span>Other person</span><input value={otherName} disabled={running} onChange={(e) => setOtherName(e.target.value)} /></label>
-            <label><span>Country</span><select value={otherCountry} disabled={running} onChange={(e) => setOtherCountry(e.target.value)}>{COUNTRIES.map((c) => <option key={c.code} value={c.code}>{c.name}</option>)}</select></label>
-            <label><span>Their output language</span><select value={otherLanguage} disabled={running} onChange={(e) => setOtherLanguage(e.target.value)}>{ALL_LANGUAGE_CODES.map((lang) => <option key={lang} value={lang}>{lang.toUpperCase()}</option>)}</select></label>
-            <label><span>Microphone input</span><select value={inputDeviceId} disabled={running} onChange={(e) => rememberInput(e.target.value)}><option value="default">System default</option>{inputs.filter((item) => item.deviceId !== 'default').map((item) => <option key={item.deviceId} value={item.deviceId}>{item.label}</option>)}</select></label>
-            <label><span>Translated audio output</span><select value={outputDeviceId} onChange={(e) => rememberOutput(e.target.value)} disabled={!outputSelectionSupported}><option value="default">System default</option>{outputs.filter((item) => item.deviceId !== 'default').map((item) => <option key={item.deviceId} value={item.deviceId}>{item.label}</option>)}</select></label>
-            <label className="wide"><span>Protected terms / glossary</span><input value={glossaryInput} disabled={running} placeholder="Brand, SKU, product, Incoterm…" onChange={(e) => { const value = e.target.value; setGlossaryInput(value); saveSessionGlossary(SESSION_ID, parseGlossary(value)); }} /></label>
-            <label><span>Speaker attribution</span><select value={speakerMode} onChange={(e) => rememberSpeakerMode(e.target.value as 'auto' | 'you' | 'other')}><option value="auto">Auto by language</option><option value="you">Force speaker = {profile.name}</option><option value="other">Force speaker = {otherName}</option></select></label>
+            <CountryPicker label="Their country" value={otherCountry} disabled={running} onChange={setOtherCountry} />
+            <LanguagePicker label="Language they hear" value={otherLanguage} disabled={running} onChange={setOtherLanguage} suggested={COUNTRY_LANGUAGE_HINTS[otherCountry] || []} />
           </div>
-          <div className="device-note">
-            <span>Use an external mic for the table. If both people use the same language or code-switch, override speaker attribution manually.</span>
-            <button className="text-button compact" onClick={refreshDevices}>Refresh devices</button>
-          </div>
-          {!outputSelectionSupported && <p className="fineprint">This browser routes TTS to the operating system's selected speaker/headset.</p>}
           <div className="route-card">
             <div><strong>{profile.name}</strong><span>{profile.countryName} · {profile.preferredLanguage.toUpperCase()}</span></div>
             <span>⇄</span>
             <div><strong>{otherName}</strong><span>{countryName(otherCountry)} · {otherLanguage.toUpperCase()}</span></div>
           </div>
           <button className={running ? 'danger' : 'primary'} onClick={running ? stop : start}>{running ? 'Stop interpreter' : 'Start interpreter'}</button>
+          <div className="field-grid"><label><span>Microphone mode</span><select value={captureMode} disabled={running} onChange={(event) => setCaptureMode(event.target.value as 'auto' | 'tap')}><option value="auto">Automatic listening</option><option value="tap">Hold to talk</option></select></label></div>
+          {captureMode === 'tap' && <div className="route-card" role="group" aria-label="Hold a speaker button while talking">
+            {(['you', 'other'] as const).map((side) => <button key={side} type="button" disabled={!running} className={talkingSide === side ? 'primary' : 'ghost'} aria-pressed={talkingSide === side} onPointerDown={(event) => { event.currentTarget.setPointerCapture(event.pointerId); beginTap(side); }} onPointerUp={endTap} onPointerCancel={endTap} onLostPointerCapture={endTap} onBlur={endTap} onKeyDown={(event) => { if (!event.repeat && (event.key === ' ' || event.key === 'Enter')) { event.preventDefault(); beginTap(side); } }} onKeyUp={(event) => { if (event.key === ' ' || event.key === 'Enter') endTap(); }}>{side === 'you' ? profile.name : otherName} · hold to talk</button>)}
+          </div>}
+          <details className="advanced-settings">
+            <summary>Audio &amp; conversation settings <span>Microphone, speaker, glossary</span></summary>
+            <div className="field-grid">
+              <label><span>Microphone input</span><select value={inputDeviceId} disabled={running} onChange={(e) => rememberInput(e.target.value)}><option value="default">System default</option>{inputs.filter((item) => item.deviceId !== 'default').map((item) => <option key={item.deviceId} value={item.deviceId}>{item.label}</option>)}</select></label>
+              <label><span>Translated audio output</span><select value={outputDeviceId} onChange={(e) => rememberOutput(e.target.value)} disabled={!outputSelectionSupported}><option value="default">System default</option>{outputs.filter((item) => item.deviceId !== 'default').map((item) => <option key={item.deviceId} value={item.deviceId}>{item.label}</option>)}</select></label>
+              <label className="wide"><span>Protected terms / glossary</span><input value={glossaryInput} disabled={running} placeholder="Brand, SKU, product, Incoterm…" onChange={(e) => { const value = e.target.value; setGlossaryInput(value); saveSessionGlossary(SESSION_ID, parseGlossary(value)); }} /></label>
+              <label><span>Speaker attribution</span><select value={speakerMode} onChange={(e) => rememberSpeakerMode(e.target.value as 'auto' | 'you' | 'other')}><option value="auto">Auto by language</option><option value="you">Force speaker = {profile.name}</option><option value="other">Force speaker = {otherName}</option></select></label>
+            </div>
+            <div className="device-note"><span>For two people at a table, use an external mic. If both speak the same language, set the speaker manually.</span><button className="text-button compact" onClick={refreshDevices}>Refresh devices</button></div>
+            {!outputSelectionSupported && <p className="fineprint">Audio plays on your system-selected speaker or headset.</p>}
+          </details>
         </div>
 
         <div className="transcript-card">
@@ -287,7 +356,7 @@ export default function FaceToFacePage() {
               </div>
             )}
           </div>
-          {turns.length === 0 ? <p className="empty-caption">Conversation will appear here.</p> : turns.map((turn) => (
+          {turns.length === 0 ? <div className="transcript-empty"><span>01 / READY WHEN YOU ARE</span><strong>Speak one thought.<br />Pause. Then switch sides.</strong><p>Original words, translation, and speaker will appear here as the conversation moves.</p></div> : turns.map((turn) => (
             <div className="turn" key={turn.id}>
               <span>{turn.participantName} · {(turn.sourceLanguage || 'auto').toUpperCase()} → {turn.targetLanguage.toUpperCase()}</span>
               <p>{turn.sourceText}</p>

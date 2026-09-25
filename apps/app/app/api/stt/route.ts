@@ -24,12 +24,12 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Unsupported audio format.' }, { status: 400 });
     }
 
-    const budgetBlocked = guardAiBudget();
+    const budgetBlocked = await guardAiBudget();
     if (budgetBlocked) return budgetBlocked;
 
     const language = cleanText(body.language, 12) || undefined;
     const result = await stt(body.audioBase64, format, language);
-    recordAiUsage(result);
+    await recordAiUsage(result);
     return NextResponse.json(result, { headers: { 'Cache-Control': 'no-store' } });
   } catch (error) {
     return NextResponse.json({ error: error instanceof Error ? error.message : 'STT failed' }, { status: 502 });

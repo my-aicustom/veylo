@@ -11,7 +11,7 @@ Veylo v1.3.0 is code-complete for the agreed internal product scope, but the fol
 - Explicit translated-audio output selection depends on `HTMLMediaElement.setSinkId`; unsupported browsers use the operating-system default output.
 - Live translated speech is intentionally skipped when its playback queue is too old or congested so stale TTS does not duck current conversation audio. Subtitle/transcript content remains available.
 - Meeting intelligence only extracts facts present in the retained transcript and should be reviewed before external use.
-- Process-local rate and budget counters are suitable for the intended small internal single-instance deployment. Horizontal scaling requires shared state such as Redis.
+- Production AI request and tracked-cost budgets require a reachable shared Redis store (`VEYLO_REDIS_URL`). Development without Redis still uses process-local counters. Per-route IP rate limits remain process-local.
 - Self-hosted production LiveKit still requires trusted TLS, TURN, firewall/NAT configuration and operational monitoring on the actual infrastructure.
 - The VEYLO name remains a working codename until brand clearance is complete.
 

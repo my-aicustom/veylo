@@ -22,14 +22,14 @@ export async function POST(request: NextRequest) {
 
     if (!transcript) return NextResponse.json({ note: null });
 
-    const budgetBlocked = guardAiBudget();
+    const budgetBlocked = await guardAiBudget();
     if (budgetBlocked) return budgetBlocked;
 
     const result: any = await chat([
       { role: 'system', content: mediatorSystem },
       { role: 'user', content: transcript },
     ], 0);
-    recordAiUsage(result);
+    await recordAiUsage(result);
 
     const note = result?.choices?.[0]?.message?.content?.trim();
     return NextResponse.json(

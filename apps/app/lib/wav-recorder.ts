@@ -119,6 +119,13 @@ export class PhraseRecorder {
     );
     if (!shouldFlush) return;
 
+    this.flush();
+  }
+
+  flush() {
+    if (!this.active || this.paused || !this.speechStart || this.chunks.length === 0) return;
+    const sampleRate = this.context?.sampleRate;
+    if (!sampleRate) return;
     const peak = this.peak;
     const merged = concat(this.chunks);
     const resampled = resample(merged, sampleRate, 16_000);
@@ -139,7 +146,7 @@ export class PhraseRecorder {
     }
   }
 
-  private reset() {
+  reset() {
     this.chunks = [];
     this.preRoll = [];
     this.preRollSamples = 0;

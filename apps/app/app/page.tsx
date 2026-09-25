@@ -3,6 +3,7 @@
 import * as React from 'react';
 import { useRouter } from 'next/navigation';
 import { ProfileForm } from '@/components/ProfileForm';
+import { BrandMark } from '@/components/BrandMark';
 import { loadProfile } from '@/lib/profile';
 import { apiUrl } from '@/lib/paths';
 import type { Profile } from '@/lib/types';
@@ -27,7 +28,7 @@ export default function HomePage() {
   if (!profile) {
     return (
       <main className="landing-shell">
-        <header className="landing-header"><div className="brand-mark">VEYLO</div><span>Private multilingual communication</span></header>
+        <header className="landing-header"><BrandMark /><span>Private multilingual communication</span></header>
         <section className="onboarding-wrap">
           <div className="eyebrow">PRIVATE CONVERSATION</div>
           <h1>Start with who you are.<br />Then just talk.</h1>
@@ -87,7 +88,7 @@ export default function HomePage() {
   return (
     <main className="landing-shell">
       <header className="landing-header">
-        <div className="brand-mark">VEYLO</div>
+        <BrandMark />
         <div className="profile-chip"><strong>{profile.name}</strong><span>{profile.countryName} · {profile.preferredLanguage.toUpperCase()}</span></div>
       </header>
       <section className="home-hero">

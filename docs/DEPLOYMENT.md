@@ -47,6 +47,8 @@ cp deploy/production/env.production.example .env.production
 
 Replace all placeholders. Then:
 
+Set `VEYLO_REDIS_URL` to a private Redis endpoint reachable from every Veylo app instance. Strict production mode rejects AI requests if the budget store is missing or unavailable; `/app/api/ready` reports the store state.
+
 ```bash
 pnpm readiness -- --env .env.production
 ```
@@ -69,12 +71,13 @@ Preflight requires:
 - OpenRouter key
 - positive hourly AI request cap
 - positive daily tracked-cost cap
+- reachable shared Redis budget store (`VEYLO_REDIS_URL`)
 
 ## AI cost controls
 
-The application provides process-level request and tracked-cost backstops. Choose limits based on the actual expected meeting load.
+The application reserves requests atomically in Redis and tracks reported provider costs there. Choose limits based on the actual expected meeting load.
 
-For defense in depth, also configure OpenRouter-side budget/key/workspace guardrails. Application-local counters reset with the process and are not shared across replicas.
+For defense in depth, also configure OpenRouter-side budget/key/workspace guardrails. Per-route IP rate limits remain process-local.
 
 ## Deploy sequence
 
@@ -116,4 +119,4 @@ Do not use the deep endpoint as a high-frequency load-balancer probe because it 
 
 ## Scaling boundary
 
-Current rate and budget counters are process-local. Before horizontal scaling, move those counters to shared state such as Redis and use a production LiveKit topology appropriate to multiple instances.
+AI budget counters are shared through Redis. Per-route IP rate limits remain process-local; move those counters to shared state before horizontal scaling, and use a production LiveKit topology appropriate to multiple instances.

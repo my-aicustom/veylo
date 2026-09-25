@@ -16,6 +16,7 @@ import {
   type RoomOptions,
 } from 'livekit-client';
 import { CallTopbar } from '@/components/CallTopbar';
+import { BrandMark } from '@/components/BrandMark';
 import { ProfileForm } from '@/components/ProfileForm';
 import { InterpreterPanel } from '@/components/InterpreterPanel';
 import { loadProfile } from '@/lib/profile';
@@ -82,7 +83,7 @@ export function RoomPageClient({ roomName }: { roomName: string }) {
     return (
       <main className="prejoin-shell" data-lk-theme="default">
         <div className="prejoin-header">
-          <a href="/app" className="brand-mark">VEYLO</a>
+          <BrandMark href="/app" />
           <div><span>{profile.name}</span><small>{profile.countryName} · {profile.preferredLanguage.toUpperCase()}</small></div>
         </div>
         <section className="prejoin-card">
@@ -136,27 +137,45 @@ function ConnectedRoom({ profile, choices, connection }: {
 
   React.useEffect(() => {
     let mounted = true;
+    let joined = false;
+    let serverConnected = false;
     const onDisconnected = () => {
-      if (mounted) router.push('/');
+      if (mounted && joined) router.push('/');
     };
     room.on(RoomEvent.Disconnected, onDisconnected);
-    room.connect(connection.serverUrl, connection.participantToken, { autoSubscribe: true })
-      .then(async () => {
-        if (!mounted) return;
-        if (choices.videoEnabled) await room.localParticipant.setCameraEnabled(true);
-        if (choices.audioEnabled) await room.localParticipant.setMicrophoneEnabled(true);
-        if (mounted) setConnected(true);
-      })
-      .catch((e) => setError(e instanceof Error ? e.message : String(e)));
+    let connectionStarted = false;
+    const connectTimer = window.setTimeout(() => {
+      if (!mounted) return;
+      connectionStarted = true;
+      room.connect(connection.serverUrl, connection.participantToken, { autoSubscribe: true })
+        .then(async () => {
+          if (!mounted) return;
+          serverConnected = true;
+          if (choices.videoEnabled) await room.localParticipant.setCameraEnabled(true);
+          if (choices.audioEnabled) await room.localParticipant.setMicrophoneEnabled(true);
+          if (mounted) {
+            joined = true;
+            setConnected(true);
+          }
+        })
+        .catch(() => {
+          if (!mounted) return;
+          setError(serverConnected
+            ? 'Connected to the room, but camera or microphone could not start. Check device permissions and try again.'
+            : 'Could not connect to the Live Call server. Check that LiveKit is running, then try again.');
+          void room.disconnect();
+        });
+    }, 0);
 
     return () => {
       mounted = false;
+      window.clearTimeout(connectTimer);
       room.off(RoomEvent.Disconnected, onDisconnected);
-      room.disconnect();
+      if (connectionStarted) void room.disconnect();
     };
   }, [choices.audioEnabled, choices.videoEnabled, connection.participantToken, connection.serverUrl, room, router]);
 
-  if (error) return <div className="center-screen"><div className="error-box">{error}</div></div>;
+  if (error) return <div className="center-screen"><div className="join-card"><div className="error-box">{error}</div><button className="primary" onClick={() => window.location.reload()}>Try again</button></div></div>;
   if (!connected) return <div className="center-screen">Connecting securely…</div>;
 
   return (

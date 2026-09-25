@@ -13,10 +13,16 @@ const goodEnv = {
   OPENROUTER_API_KEY: 'test-openrouter-key-abcdefghijklmnopqrstuvwxyz',
   VEYLO_AI_MAX_REQUESTS_PER_HOUR: '1200',
   VEYLO_AI_MAX_TRACKED_COST_USD_PER_DAY: '10',
+  VEYLO_REDIS_URL: 'redis://redis.internal:6379',
 };
 
 test('secure production environment passes validation', () => {
   assert.deepEqual(validateProductionEnv(goodEnv), []);
+});
+
+test('production requires a shared Redis budget store', () => {
+  const errors = validateProductionEnv({ ...goodEnv, VEYLO_REDIS_URL: '' });
+  assert.ok(errors.some((error) => error.includes('VEYLO_REDIS_URL')));
 });
 
 test('strict production mode is mandatory', () => {

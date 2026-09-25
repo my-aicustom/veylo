@@ -20,6 +20,7 @@ export async function GET(request: NextRequest) {
   const strict = process.env.VEYLO_STRICT_PRODUCTION === 'true';
   const appUrl = process.env.APP_URL || '';
   const livekitUrl = process.env.LIVEKIT_URL || '';
+  const aiBudget = await aiBudgetSnapshot();
 
   const checks = {
     openrouterKey: present(process.env.OPENROUTER_API_KEY),
@@ -31,6 +32,7 @@ export async function GET(request: NextRequest) {
     signedInvites: !strict || inviteProtectionEnabled(),
     aiRequestCap: !strict || positive(process.env.VEYLO_AI_MAX_REQUESTS_PER_HOUR),
     aiCostCap: !strict || positive(process.env.VEYLO_AI_MAX_TRACKED_COST_USD_PER_DAY),
+    aiBudgetStore: !strict || aiBudget.store === 'redis',
   };
 
   const ready = Object.values(checks).every(Boolean);
@@ -41,7 +43,7 @@ export async function GET(request: NextRequest) {
       ready,
       strict,
       checks,
-      aiBudget: aiBudgetSnapshot(),
+      aiBudget,
       serverTime: new Date().toISOString(),
     },
     {

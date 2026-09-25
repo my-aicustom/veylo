@@ -107,14 +107,14 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'A transcript is required.' }, { status: 400 });
     }
 
-    const budgetBlocked = guardAiBudget();
+    const budgetBlocked = await guardAiBudget();
     if (budgetBlocked) return budgetBlocked;
 
     const result: any = await chat([
       { role: 'system', content: meetingIntelligenceSystem },
       { role: 'user', content: transcript },
     ], 0, 1_800);
-    recordAiUsage(result);
+    await recordAiUsage(result);
 
     const content = result?.choices?.[0]?.message?.content;
     if (typeof content !== 'string' || !content.trim()) {

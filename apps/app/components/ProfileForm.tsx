@@ -1,7 +1,9 @@
 'use client';
 
 import * as React from 'react';
-import { ALL_LANGUAGE_CODES, COUNTRIES, COUNTRY_LANGUAGE_HINTS } from '@/lib/countries';
+import { COUNTRY_LANGUAGE_HINTS } from '@/lib/countries';
+import { CountryPicker } from './CountryPicker';
+import { LanguagePicker } from './LanguagePicker';
 import { countryName, defaultLanguage, saveProfile } from '@/lib/profile';
 import type { Profile } from '@/lib/types';
 
@@ -33,30 +35,10 @@ export function ProfileForm({ onDone, compact = false }: { onDone: (profile: Pro
         <span>Name</span>
         <input value={name} onChange={(e) => setName(e.target.value)} placeholder="Your name" autoFocus required />
       </label>
-      <label>
-        <span>Country</span>
-        <select value={countryCode} onChange={(e) => setCountryCode(e.target.value)}>
-          {COUNTRIES.map((country) => <option key={country.code} value={country.code}>{country.name}</option>)}
-        </select>
-      </label>
-      <label>
-        <span>Preferred language</span>
-        <select value={language} onChange={(e) => setLanguage(e.target.value)}>
-          <optgroup label="Suggested for this country">
-            {hints.map((code) => <option key={`hint-${code}`} value={code}>{languageLabel(code)} ({code})</option>)}
-          </optgroup>
-          <optgroup label="All available language hints">
-            {ALL_LANGUAGE_CODES.filter((code) => !hints.includes(code)).map((code) => <option key={code} value={code}>{languageLabel(code)} ({code})</option>)}
-          </optgroup>
-        </select>
-      </label>
+      <CountryPicker value={countryCode} onChange={setCountryCode} />
+      <LanguagePicker label="Preferred language" value={language} onChange={setLanguage} suggested={hints} />
       <button className="primary" type="submit">Continue</button>
-      <p className="fineprint">Country is only a language hint. Spoken language is detected during interpretation.</p>
+      <p className="fineprint">Country is only a language hint. Choose your preferred language separately; speech is detected while you talk.</p>
     </form>
   );
-}
-
-function languageLabel(code: string) {
-  try { return new Intl.DisplayNames(['en'], { type: 'language' }).of(code) || code; }
-  catch { return code; }
 }

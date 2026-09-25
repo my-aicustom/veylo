@@ -18,24 +18,22 @@ async function checkOpenRouter() {
 
   const started = Date.now();
   try {
-    const response = await fetch('https://openrouter.ai/api/v1/models', {
+    const catalog = async (modality?: 'transcription' | 'speech') => {
+      const query = modality ? `?output_modalities=${modality}` : '';
+      const response = await fetch(`https://openrouter.ai/api/v1/models${query}`, {
       headers: { Authorization: `Bearer ${key}` },
       cache: 'no-store',
       signal: AbortSignal.timeout(8_000),
     });
-    if (!response.ok) {
-      return {
-        reachable: false,
-        latencyMs: Date.now() - started,
-        error: `OpenRouter returned HTTP ${response.status}`,
-        models: {},
-      };
-    }
-
+      if (!response.ok) throw new Error(`OpenRouter ${modality || 'text'} catalog returned HTTP ${response.status}`);
     const payload = await response.json();
-    const ids = new Set<string>(
+      return new Set<string>(
       Array.isArray(payload?.data) ? payload.data.map((model: any) => model?.id).filter(Boolean) : [],
     );
+    };
+    const [textIds, transcriptionIds, speechIds] = await Promise.all([
+      catalog(), catalog('transcription'), catalog('speech'),
+    ]);
     const stt = process.env.STT_MODEL || 'openai/whisper-large-v3-turbo';
     const translation = process.env.TRANSLATION_MODEL || 'google/gemini-3.1-flash-lite';
     const tts = process.env.TTS_MODEL || 'x-ai/grok-voice-tts-1.0';
@@ -45,9 +43,9 @@ async function checkOpenRouter() {
       latencyMs: Date.now() - started,
       error: null,
       models: {
-        stt: { id: stt, listed: ids.has(stt) },
-        translation: { id: translation, listed: ids.has(translation) },
-        tts: { id: tts, listed: ids.has(tts) },
+        stt: { id: stt, listed: transcriptionIds.has(stt) },
+        translation: { id: translation, listed: textIds.has(translation) },
+        tts: { id: tts, listed: speechIds.has(tts) },
       },
     };
   } catch (error) {
@@ -109,7 +107,7 @@ export async function GET(request: NextRequest) {
       appUrl: process.env.APP_URL || null,
       basePath: process.env.NEXT_PUBLIC_BASE_PATH || '/app',
     },
-    aiBudget: aiBudgetSnapshot(),
+    aiBudget: await aiBudgetSnapshot(),
   };
 
   if (!deep) {

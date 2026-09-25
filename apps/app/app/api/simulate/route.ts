@@ -37,11 +37,11 @@ export async function POST(request: NextRequest) {
       { role: 'user', content: text },
     ];
 
-    const budgetBlocked = guardAiBudget();
+    const budgetBlocked = await guardAiBudget();
     if (budgetBlocked) return budgetBlocked;
 
     const result: any = await chat(messages, 0.65);
-    recordAiUsage(result);
+    await recordAiUsage(result);
 
     const reply = result?.choices?.[0]?.message?.content?.trim();
     if (!reply) throw new Error('Simulation model returned empty output');

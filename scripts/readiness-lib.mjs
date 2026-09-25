@@ -74,6 +74,9 @@ export function validateProductionEnv(env) {
   if (!positive(env.VEYLO_AI_MAX_TRACKED_COST_USD_PER_DAY)) {
     errors.push('VEYLO_AI_MAX_TRACKED_COST_USD_PER_DAY must be a positive number in production.');
   }
+  if (!/^rediss?:\/\/\S+$/i.test(env.VEYLO_REDIS_URL || '')) {
+    errors.push('VEYLO_REDIS_URL must be a Redis URL in production.');
+  }
 
   return errors;
 }

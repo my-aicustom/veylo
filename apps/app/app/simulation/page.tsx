@@ -2,9 +2,12 @@
 
 import * as React from 'react';
 import { useRouter } from 'next/navigation';
-import { ALL_LANGUAGE_CODES, COUNTRIES } from '@/lib/countries';
+import { COUNTRY_LANGUAGE_HINTS } from '@/lib/countries';
+import { CountryPicker } from '@/components/CountryPicker';
+import { LanguagePicker } from '@/components/LanguagePicker';
 import { countryName, defaultLanguage, loadProfile } from '@/lib/profile';
 import { PhraseRecorder } from '@/lib/wav-recorder';
+import { isRecentSpeechEcho } from '@/lib/echo-guard';
 import { playSpeech, simulate, transcribe, translate } from '@/lib/client-ai';
 import { listAudioDevices, type AudioDeviceChoice } from '@/lib/audio-devices';
 import { clearSimulation, downloadSimulation, loadSimulation, saveSimulation, type SimulationTurn } from '@/lib/simulation-persistence';
@@ -32,6 +35,10 @@ export default function SimulationPage() {
   const turnsRef = React.useRef<SimulationTurn[]>([]);
   const sessionId = React.useMemo(() => `simulation:${country}:${role.trim().toLowerCase().slice(0, 36)}:${scenario.trim().toLowerCase().slice(0, 48)}`, [country, role, scenario]);
   const alive = React.useRef(false);
+  const isPlayingAudioRef = React.useRef(false);
+  const recentSpokenTexts = React.useRef<{ text: string; at: number }[]>([]);
+  const sessionRef = React.useRef(0);
+  const playbackRef = React.useRef<Promise<void> | null>(null);
 
   const refreshDevices = React.useCallback(async () => {
     try {
@@ -66,11 +73,20 @@ export default function SimulationPage() {
   }, [refreshDevices]);
 
   async function play(text: string) {
-    recorderRef.current?.pause();
+    const recorder = recorderRef.current;
+    const session = sessionRef.current;
+    isPlayingAudioRef.current = true;
+    recorder?.pause();
     try {
       await playSpeech(text, outputDeviceId);
     } finally {
-      if (alive.current) recorderRef.current?.resume();
+      recentSpokenTexts.current = [...recentSpokenTexts.current.slice(-4), { text, at: Date.now() }];
+      await new Promise((resolve) => window.setTimeout(resolve, 850));
+      recorder?.reset();
+      if (sessionRef.current === session) {
+        isPlayingAudioRef.current = false;
+        if (alive.current && recorderRef.current === recorder) recorder?.resume();
+      }
     }
   }
 
@@ -82,11 +98,18 @@ export default function SimulationPage() {
   }
 
   async function process(bytes: Uint8Array) {
-    if (!profile || !alive.current) return;
+    const session = sessionRef.current;
+    if (!profile || !alive.current || isPlayingAudioRef.current) return;
     setStatus('Understanding you…');
     const stt = await transcribe(bytes);
     const text = stt.text.trim();
-    if (!text || !alive.current) return;
+    if (!text || !alive.current || sessionRef.current !== session || isPlayingAudioRef.current) return;
+
+    if (isRecentSpeechEcho(text, recentSpokenTexts.current)) {
+      console.warn('[simulation] Ignored acoustic echo of AI voice:', text);
+      if (alive.current) setStatus('Listening');
+      return;
+    }
 
     const priorHistory = turnsRef.current.slice(-12);
     const userTurn: SimulationTurn = {
@@ -112,7 +135,7 @@ export default function SimulationPage() {
         translatedText: turn.speaker === 'ai' ? turn.text : undefined,
       })),
     });
-    if (!alive.current) return;
+    if (!alive.current || sessionRef.current !== session) return;
 
     const aiTurn: SimulationTurn = {
       id: crypto.randomUUID(),
@@ -131,7 +154,7 @@ export default function SimulationPage() {
           sourceCountry: countryName(country),
           targetCountry: profile.countryName,
         }).then((translated) => {
-          if (!alive.current) return;
+          if (!alive.current || sessionRef.current !== session) return;
           const updated = turnsRef.current.map((turn) =>
             turn.id === aiTurn.id ? { ...turn, translation: translated.text } : turn,
           );
@@ -141,21 +164,32 @@ export default function SimulationPage() {
         })
       : Promise.resolve();
 
-    await Promise.all([play(result.reply), subtitlePromise]);
-    if (alive.current) setStatus('Listening');
+    const playback = play(result.reply);
+    playbackRef.current = playback.then(() => {}, () => {});
+    await Promise.all([playback, subtitlePromise]);
+    if (alive.current && sessionRef.current === session) setStatus('Listening');
   }
 
-  async function start() {
+  async function start(deviceId = inputDeviceId) {
     if (!profile) return;
+    const session = ++sessionRef.current;
+    let stream: MediaStream | undefined;
     try {
-      const stream = await navigator.mediaDevices.getUserMedia({
+      if (playbackRef.current) await playbackRef.current;
+      if (sessionRef.current !== session) return;
+      isPlayingAudioRef.current = false;
+      stream = await navigator.mediaDevices.getUserMedia({
         audio: {
-          ...(inputDeviceId !== 'default' ? { deviceId: { exact: inputDeviceId } } : {}),
+          ...(deviceId !== 'default' ? { deviceId: { exact: deviceId } } : {}),
           echoCancellation: true,
           noiseSuppression: true,
           autoGainControl: true,
         },
       });
+      if (sessionRef.current !== session) { stream.getTracks().forEach((track) => track.stop()); return; }
+      stream.getAudioTracks().forEach((track) => track.addEventListener('ended', () => {
+        if (sessionRef.current === session) { stop(); setStatus('Microphone disconnected · choose another input'); }
+      }, { once: true }));
       await refreshDevices();
       alive.current = true;
       queueRef.current = Promise.resolve();
@@ -165,6 +199,8 @@ export default function SimulationPage() {
         maxPhraseMs: 5200,
         threshold: 0.015,
         onPhrase: (phrase) => {
+          if (sessionRef.current !== session) return;
+          if (isPlayingAudioRef.current) return;
           queueRef.current = queueRef.current.then(() => process(phrase.bytes)).catch((error) => {
             console.warn(error);
             setStatus('AI error · try again');
@@ -173,15 +209,21 @@ export default function SimulationPage() {
       });
       recorderRef.current = recorder;
       await recorder.start();
+      if (sessionRef.current !== session) { recorder.stop(); return; }
       setRunning(true);
       setStatus('Listening');
     } catch (error) {
+      if (sessionRef.current !== session) return;
+      recorderRef.current?.stop();
+      recorderRef.current = null;
+      stream?.getTracks().forEach((track) => track.stop());
       alive.current = false;
       setStatus(error instanceof Error ? error.message : 'Could not start microphone');
     }
   }
 
   function stop() {
+    sessionRef.current += 1;
     alive.current = false;
     recorderRef.current?.stop();
     recorderRef.current = null;
@@ -192,6 +234,11 @@ export default function SimulationPage() {
   function rememberInput(value: string) {
     setInputDeviceId(value);
     try { window.localStorage.setItem('veylo:sim-input', value); } catch {}
+    if (running) {
+      stop();
+      setStatus('Switching microphone…');
+      void start(value);
+    }
   }
 
   function rememberOutput(value: string) {
@@ -225,26 +272,13 @@ export default function SimulationPage() {
       </header>
 
       <section className="tool-grid">
-        <div className="setup-card">
+        <div className="setup-card simulation-setup">
           <div className="eyebrow">PRACTICE / INTERNATIONAL CONVERSATION</div>
           <h1>{role}</h1>
           <div className="field-grid">
-            <label>
-              <span>Counterpart country</span>
-              <select value={country} disabled={running} onChange={(e) => setCountry(e.target.value)}>
-                {COUNTRIES.map((c) => <option key={c.code} value={c.code}>{c.name}</option>)}
-              </select>
-            </label>
-            <label>
-              <span>Counterpart language</span>
-              <select value={language} disabled={running} onChange={(e) => setLanguage(e.target.value)}>
-                {ALL_LANGUAGE_CODES.map((lang) => <option key={lang} value={lang}>{lang.toUpperCase()}</option>)}
-              </select>
-            </label>
+            <CountryPicker label="Counterpart country" value={country} disabled={running} onChange={setCountry} />
+            <LanguagePicker label="Counterpart language" value={language} disabled={running} onChange={setLanguage} suggested={COUNTRY_LANGUAGE_HINTS[country] || []} />
             <label><span>Role</span><input value={role} disabled={running} onChange={(e) => setRole(e.target.value)} /></label>
-            <label className="wide"><span>Scenario</span><input value={scenario} disabled={running} onChange={(e) => setScenario(e.target.value)} /></label>
-            <label><span>Microphone input</span><select value={inputDeviceId} disabled={running} onChange={(e) => rememberInput(e.target.value)}><option value="default">System default</option>{inputs.filter((item) => item.deviceId !== 'default').map((item) => <option key={item.deviceId} value={item.deviceId}>{item.label}</option>)}</select></label>
-            <label><span>AI voice output</span><select value={outputDeviceId} onChange={(e) => rememberOutput(e.target.value)} disabled={!outputSelectionSupported}><option value="default">System default</option>{outputs.filter((item) => item.deviceId !== 'default').map((item) => <option key={item.deviceId} value={item.deviceId}>{item.label}</option>)}</select></label>
           </div>
 
           <div className="route-card">
@@ -253,9 +287,17 @@ export default function SimulationPage() {
             <div><strong>{role}</strong><span>{countryName(country)} · {language.toUpperCase()}</span></div>
           </div>
 
-          <button className={running ? 'danger' : 'primary'} onClick={running ? stop : start}>
+          <button className={running ? 'danger' : 'primary'} onClick={running ? stop : () => { void start(); }}>
             {running ? 'End simulation' : 'Start simulation'}
           </button>
+          <details className="advanced-settings">
+            <summary>Scenario &amp; audio settings <span>Conversation context, microphone, speaker</span></summary>
+            <div className="field-grid">
+              <label className="wide"><span>Scenario</span><input value={scenario} disabled={running} onChange={(e) => setScenario(e.target.value)} /></label>
+              <label><span>Microphone input</span><select value={inputDeviceId} onChange={(e) => rememberInput(e.target.value)}><option value="default">System default</option>{inputs.filter((item) => item.deviceId !== 'default').map((item) => <option key={item.deviceId} value={item.deviceId}>{item.label}</option>)}</select></label>
+              <label><span>AI voice output</span><select value={outputDeviceId} onChange={(e) => rememberOutput(e.target.value)} disabled={!outputSelectionSupported}><option value="default">System default</option>{outputs.filter((item) => item.deviceId !== 'default').map((item) => <option key={item.deviceId} value={item.deviceId}>{item.label}</option>)}</select></label>
+            </div>
+          </details>
         </div>
 
         <div className="transcript-card" aria-live="polite">

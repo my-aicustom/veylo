@@ -1,7 +1,9 @@
 node_modules
 .pnpm-store
 .env
+.env.*
 .env.local
+*.env
 .next
 dist
 .astro
@@ -9,3 +11,5 @@ dist
 *.log
 coverage
 *.tsbuildinfo
+.local-livekit/
+.playwright-cli/
