@@ -12,9 +12,9 @@ class ClientRequestError extends Error {
   }
 }
 
-async function fetchJson<T>(url: string, body: unknown, timeoutMs = 45_000): Promise<T> {
+async function fetchJson<T>(url: string, body: unknown, timeoutMs = 45_000, attempts = 2): Promise<T> {
   let lastError: unknown;
-  for (let attempt = 0; attempt < 2; attempt += 1) {
+  for (let attempt = 0; attempt < attempts; attempt += 1) {
     const controller = new AbortController();
     const timer = window.setTimeout(() => controller.abort(), timeoutMs);
     try {
@@ -32,7 +32,7 @@ async function fetchJson<T>(url: string, body: unknown, timeoutMs = 45_000): Pro
     } catch (error) {
       lastError = error;
       const retryable = error instanceof ClientRequestError ? error.retryable : true;
-      if (!retryable || attempt === 1) throw error;
+      if (!retryable || attempt === attempts - 1) throw error;
     } finally {
       window.clearTimeout(timer);
     }
@@ -49,10 +49,10 @@ function base64(bytes: Uint8Array) {
   return btoa(binary);
 }
 
-export function transcribe(bytes: Uint8Array, language?: string) {
+export function transcribe(bytes: Uint8Array, language?: string, vocabulary?: string[]) {
   return fetchJson<{ text: string; language?: string; duration?: number; usage?: any }>(apiUrl('/api/stt'), {
-    audioBase64: base64(bytes), format: 'wav', language,
-  });
+    audioBase64: base64(bytes), format: 'wav', language, vocabulary,
+  }, 40_000, 1); // The server owns bounded provider retries; avoid duplicate audio jobs.
 }
 
 export function translate(text: string, args: {

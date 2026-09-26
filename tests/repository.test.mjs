@@ -238,7 +238,7 @@ test('AI Simulation persists practice history and supports explicit audio device
   assert.ok(page.includes('downloadSimulation'));
   assert.ok(page.includes('Microphone input'));
   assert.ok(page.includes('AI voice output'));
-  assert.ok(page.includes('await transcribe(bytes)'));
+  assert.ok(page.includes('await transcribe(bytes, undefined,'));
   assert.ok(persistence.includes('MAX_TURNS = 160'));
 });
 
@@ -248,7 +248,7 @@ test('browser API retry distinguishes transient failures from deterministic clie
   assert.ok(client.includes('response.status === 408'));
   assert.ok(client.includes('response.status === 429'));
   assert.ok(client.includes('response.status >= 500'));
-  assert.ok(client.includes('if (!retryable || attempt === 1) throw error'));
+  assert.ok(client.includes('if (!retryable || attempt === attempts - 1) throw error'));
 });
 
 

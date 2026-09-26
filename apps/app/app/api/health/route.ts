@@ -34,7 +34,7 @@ async function checkOpenRouter() {
     const [textIds, transcriptionIds, speechIds] = await Promise.all([
       catalog(), catalog('transcription'), catalog('speech'),
     ]);
-    const stt = process.env.STT_MODEL || 'openai/whisper-large-v3-turbo';
+    const stt = process.env.STT_MODEL || 'google/gemini-2.5-flash';
     const translation = process.env.TRANSLATION_MODEL || 'google/gemini-3.1-flash-lite';
     const tts = process.env.TTS_MODEL || 'x-ai/grok-voice-tts-1.0';
 
@@ -43,7 +43,7 @@ async function checkOpenRouter() {
       latencyMs: Date.now() - started,
       error: null,
       models: {
-        stt: { id: stt, listed: transcriptionIds.has(stt) },
+        stt: { id: stt, listed: (stt.startsWith('openai/whisper-') ? transcriptionIds : textIds).has(stt) },
         translation: { id: translation, listed: textIds.has(translation) },
         tts: { id: tts, listed: speechIds.has(tts) },
       },

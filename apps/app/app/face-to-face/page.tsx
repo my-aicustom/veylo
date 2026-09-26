@@ -56,6 +56,8 @@ export default function FaceToFacePage() {
   const sessionRef = React.useRef(0);
   const playbackRef = React.useRef<Promise<void> | null>(null);
   const heldSide = React.useRef<'you' | 'other' | null>(null);
+  const glossaryRef = React.useRef<string[]>([]);
+  glossaryRef.current = parseGlossary(glossaryInput);
 
   const refreshDevices = React.useCallback(async () => {
     try {
@@ -81,7 +83,11 @@ export default function FaceToFacePage() {
     setReady(true);
   }, [refreshDevices]);
   React.useEffect(() => setOtherLanguage(defaultLanguage(otherCountry)), [otherCountry]);
-  React.useEffect(() => () => recorderRef.current?.stop(), []);
+  React.useEffect(() => () => {
+    alive.current = false;
+    sessionRef.current += 1;
+    recorderRef.current?.stop();
+  }, []);
   React.useEffect(() => {
     const handler = () => void refreshDevices();
     navigator.mediaDevices?.addEventListener?.('devicechange', handler);
@@ -126,7 +132,7 @@ export default function FaceToFacePage() {
       await playSpeech(text, outputDeviceId);
     } finally {
       recentSpokenTexts.current = [...recentSpokenTexts.current.slice(-4), { text, at: Date.now() }];
-      await new Promise((resolve) => window.setTimeout(resolve, 850));
+      await new Promise((resolve) => window.setTimeout(resolve, 250));
       recorder?.reset();
       if (sessionRef.current === session) {
         isPlayingAudioRef.current = false;
@@ -139,7 +145,7 @@ export default function FaceToFacePage() {
     const session = sessionRef.current;
     if (!profile || !alive.current || isPlayingAudioRef.current) return;
     setStatus('Understanding…');
-    const stt = await transcribe(bytes);
+    const stt = await transcribe(bytes, undefined, [...glossaryRef.current, profile.name, otherName]);
     const sourceText = stt.text.trim();
     if (!sourceText || !alive.current || sessionRef.current !== session || isPlayingAudioRef.current) return;
 
@@ -162,7 +168,7 @@ export default function FaceToFacePage() {
           targetLanguage,
           sourceCountry: side === 'you' ? profile.countryName : countryName(otherCountry),
           targetCountry: side === 'you' ? countryName(otherCountry) : profile.countryName,
-          glossary: parseGlossary(glossaryInput),
+          glossary: glossaryRef.current,
         });
       } catch (error) {
         translationState = 'failed';
@@ -213,16 +219,19 @@ export default function FaceToFacePage() {
       alive.current = true;
       queueRef.current = Promise.resolve();
       const recorder = new PhraseRecorder(stream, {
-        silenceMs: 600,
+        silenceMs: 1_100,
         minSpeechMs: 280,
-        maxPhraseMs: 5000,
+        maxPhraseMs: 20_000,
         threshold: 0.015,
         onPhrase: (phrase) => {
           if (sessionRef.current !== session) return;
           const side = captureMode === 'tap' ? heldSide.current : undefined;
           if (captureMode === 'tap' && !side) return;
           if (isPlayingAudioRef.current) return;
-          queueRef.current = queueRef.current.then(() => process(phrase.bytes, side || undefined)).catch((error) => {
+          queueRef.current = queueRef.current.then(() => {
+            if (sessionRef.current === session) return process(phrase.bytes, side || undefined);
+          }).catch((error) => {
+            if (sessionRef.current !== session) return;
             console.warn(error);
             setStatus('AI error · original conversation can continue');
           });

@@ -65,7 +65,11 @@ export default function SimulationPage() {
     setTurns(restored);
   }, [sessionId]);
   React.useEffect(() => { turnsRef.current = turns; }, [turns]);
-  React.useEffect(() => () => recorderRef.current?.stop(), []);
+  React.useEffect(() => () => {
+    alive.current = false;
+    sessionRef.current += 1;
+    recorderRef.current?.stop();
+  }, []);
   React.useEffect(() => {
     const handler = () => void refreshDevices();
     navigator.mediaDevices?.addEventListener?.('devicechange', handler);
@@ -81,7 +85,7 @@ export default function SimulationPage() {
       await playSpeech(text, outputDeviceId);
     } finally {
       recentSpokenTexts.current = [...recentSpokenTexts.current.slice(-4), { text, at: Date.now() }];
-      await new Promise((resolve) => window.setTimeout(resolve, 850));
+      await new Promise((resolve) => window.setTimeout(resolve, 250));
       recorder?.reset();
       if (sessionRef.current === session) {
         isPlayingAudioRef.current = false;
@@ -101,7 +105,7 @@ export default function SimulationPage() {
     const session = sessionRef.current;
     if (!profile || !alive.current || isPlayingAudioRef.current) return;
     setStatus('Understanding you…');
-    const stt = await transcribe(bytes);
+    const stt = await transcribe(bytes, undefined, [profile.name, role, scenario]);
     const text = stt.text.trim();
     if (!text || !alive.current || sessionRef.current !== session || isPlayingAudioRef.current) return;
 
@@ -194,14 +198,17 @@ export default function SimulationPage() {
       alive.current = true;
       queueRef.current = Promise.resolve();
       const recorder = new PhraseRecorder(stream, {
-        silenceMs: 620,
+        silenceMs: 1_100,
         minSpeechMs: 280,
-        maxPhraseMs: 5200,
+        maxPhraseMs: 20_000,
         threshold: 0.015,
         onPhrase: (phrase) => {
           if (sessionRef.current !== session) return;
           if (isPlayingAudioRef.current) return;
-          queueRef.current = queueRef.current.then(() => process(phrase.bytes)).catch((error) => {
+          queueRef.current = queueRef.current.then(() => {
+            if (sessionRef.current === session) return process(phrase.bytes);
+          }).catch((error) => {
+            if (sessionRef.current !== session) return;
             console.warn(error);
             setStatus('AI error · try again');
           });

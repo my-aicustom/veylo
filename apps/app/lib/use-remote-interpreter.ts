@@ -95,7 +95,7 @@ export function useRemoteInterpreter(
 
     setStatus(`Understanding ${participant.name || 'participant'}…`);
     const sttStartedAt = performance.now();
-    const stt = await transcribe(bytes);
+    const stt = await transcribe(bytes, undefined, glossaryRef.current);
     const sttMs = performance.now() - sttStartedAt;
 
     const sourceText = (stt.text || '').trim();
@@ -242,7 +242,7 @@ export function useRemoteInterpreter(
     const processStartedAt = performance.now();
     const captureQueueMs = processStartedAt - phraseEndedAt;
     const sttStartedAt = performance.now();
-    const stt = await transcribe(bytes);
+    const stt = await transcribe(bytes, undefined, glossaryRef.current);
     const sttMs = performance.now() - sttStartedAt;
     const sourceText = (stt.text || '').trim();
     if (!sourceText || stopped.current || !enabled) return;
@@ -301,9 +301,9 @@ export function useRemoteInterpreter(
       const clone = track.mediaStreamTrack.clone();
       const stream = new MediaStream([clone]);
       const recorder = new PhraseRecorder(stream, {
-        silenceMs: 560,
+        silenceMs: 1_100,
         minSpeechMs: 260,
-        maxPhraseMs: 4_600,
+        maxPhraseMs: 20_000,
         threshold: 0.012,
         preRollMs: 180,
         onPhrase: (phrase) => {
@@ -358,9 +358,9 @@ export function useRemoteInterpreter(
         track,
         queue: Promise.resolve(),
         recorder: new PhraseRecorder(stream, {
-          silenceMs: 560,
+          silenceMs: 1_100,
           minSpeechMs: 260,
-          maxPhraseMs: 4_600,
+          maxPhraseMs: 20_000,
           threshold: 0.012,
           preRollMs: 180,
           onPhrase: (phrase) => {

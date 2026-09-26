@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { stt } from '@/lib/ai/openrouter';
+import { sttVocabulary } from '@/lib/stt-vocabulary';
 import { guardAiBudget, recordAiUsage } from '@/lib/ai-budget';
 import { cleanText, estimatedBase64Bytes, guardApi } from '@/lib/api-guard';
 
@@ -11,12 +12,18 @@ export async function POST(request: NextRequest) {
   if (blocked) return blocked;
 
   try {
-    const body = await request.json();
+    const body = await request.json().catch(() => null);
+    if (!body || typeof body !== 'object' || Array.isArray(body)) {
+      return NextResponse.json({ error: 'A JSON audio object is required.' }, { status: 400 });
+    }
     if (typeof body.audioBase64 !== 'string' || !body.audioBase64 || typeof body.format !== 'string') {
       return NextResponse.json({ error: 'audioBase64 and format are required' }, { status: 400 });
     }
     if (estimatedBase64Bytes(body.audioBase64) > MAX_AUDIO_BYTES) {
       return NextResponse.json({ error: 'Audio payload is too large.' }, { status: 413 });
+    }
+    if (body.audioBase64.length % 4 !== 0 || !/^[A-Za-z0-9+/]+={0,2}$/.test(body.audioBase64)) {
+      return NextResponse.json({ error: 'Audio must be valid base64.' }, { status: 400 });
     }
 
     const format = cleanText(body.format, 8).toLowerCase();
@@ -28,7 +35,7 @@ export async function POST(request: NextRequest) {
     if (budgetBlocked) return budgetBlocked;
 
     const language = cleanText(body.language, 12) || undefined;
-    const result = await stt(body.audioBase64, format, language);
+    const result = await stt(body.audioBase64, format, language, sttVocabulary(body.vocabulary), request.signal);
     await recordAiUsage(result);
     return NextResponse.json(result, { headers: { 'Cache-Control': 'no-store' } });
   } catch (error) {
