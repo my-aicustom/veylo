@@ -5,12 +5,26 @@
 import React from 'react';
 import {
   Document,
+  Font,
   Page,
   Text,
   View,
   StyleSheet,
 } from '@react-pdf/renderer';
 
+Font.register({
+  family: 'Roboto',
+  fonts: [
+    {
+      src: 'https://cdnjs.cloudflare.com/ajax/libs/pdfmake/0.2.7/fonts/Roboto/Roboto-Regular.ttf',
+      fontWeight: 'normal',
+    },
+    {
+      src: 'https://cdnjs.cloudflare.com/ajax/libs/pdfmake/0.2.7/fonts/Roboto/Roboto-Medium.ttf',
+      fontWeight: 'bold',
+    },
+  ],
+});
 
 // ─── Types ──────────────────────────────────────────────────────────────────
 
@@ -59,29 +73,29 @@ const WHITE = '#FFFFFF';
 const LIGHT = '#F8FAFC';
 
 const base = StyleSheet.create({
-  page: { fontSize: 9, fontFamily: 'Helvetica', padding: 36, color: '#1E293B' },
+  page: { fontSize: 9, fontFamily: 'Roboto', padding: 36, color: '#1E293B' },
   header: { backgroundColor: EMERALD, padding: 16, marginBottom: 16, flexDirection: 'row', justifyContent: 'space-between' },
-  headerTitle: { color: WHITE, fontSize: 16, fontFamily: 'Helvetica-Bold' },
+  headerTitle: { color: WHITE, fontSize: 16, fontFamily: 'Roboto', fontWeight: 'bold' },
   headerSub: { color: '#CCFBF1', fontSize: 8, marginTop: 2 },
-  docType: { color: WHITE, fontSize: 11, fontFamily: 'Helvetica-Bold', textAlign: 'right' },
+  docType: { color: WHITE, fontSize: 11, fontFamily: 'Roboto', fontWeight: 'bold', textAlign: 'right' },
   section: { marginBottom: 12 },
-  sectionTitle: { fontSize: 8, fontFamily: 'Helvetica-Bold', color: EMERALD, textTransform: 'uppercase', letterSpacing: 0.8, marginBottom: 4, borderBottom: `1 solid ${EMERALD}`, paddingBottom: 2 },
+  sectionTitle: { fontSize: 8, fontFamily: 'Roboto', fontWeight: 'bold', color: EMERALD, textTransform: 'uppercase', letterSpacing: 0.8, marginBottom: 4, borderBottom: `1 solid ${EMERALD}`, paddingBottom: 2 },
   row: { flexDirection: 'row', gap: 16 },
   col: { flex: 1 },
   label: { color: SLATE, fontSize: 7.5, marginBottom: 1 },
-  value: { fontSize: 8.5, fontFamily: 'Helvetica-Bold' },
+  value: { fontSize: 8.5, fontFamily: 'Roboto', fontWeight: 'bold' },
   // Table
   table: { borderTop: `1 solid ${BORDER}`, marginTop: 4 },
   tableHeader: { flexDirection: 'row', backgroundColor: LIGHT, borderBottom: `1 solid ${BORDER}`, padding: '4 6' },
-  tableHeaderCell: { fontFamily: 'Helvetica-Bold', fontSize: 7.5, color: SLATE, flex: 1 },
+  tableHeaderCell: { fontFamily: 'Roboto', fontWeight: 'bold', fontSize: 7.5, color: SLATE, flex: 1 },
   tableRow: { flexDirection: 'row', borderBottom: `0.5 solid ${BORDER}`, padding: '4 6' },
   tableRowAlt: { flexDirection: 'row', backgroundColor: LIGHT, borderBottom: `0.5 solid ${BORDER}`, padding: '4 6' },
   tableCell: { fontSize: 8, flex: 1 },
   tableCellRight: { fontSize: 8, flex: 1, textAlign: 'right' },
   // Total row
   totalRow: { flexDirection: 'row', borderTop: `1.5 solid ${EMERALD}`, padding: '5 6', backgroundColor: '#F0FDF4' },
-  totalLabel: { flex: 3, fontFamily: 'Helvetica-Bold', fontSize: 8.5, color: EMERALD },
-  totalValue: { flex: 1, fontFamily: 'Helvetica-Bold', fontSize: 8.5, textAlign: 'right', color: EMERALD },
+  totalLabel: { flex: 3, fontFamily: 'Roboto', fontWeight: 'bold', fontSize: 8.5, color: EMERALD },
+  totalValue: { flex: 1, fontFamily: 'Roboto', fontWeight: 'bold', fontSize: 8.5, textAlign: 'right', color: EMERALD },
   // Footer
   footer: { position: 'absolute', bottom: 24, left: 36, right: 36, borderTop: `0.5 solid ${BORDER}`, paddingTop: 6, flexDirection: 'row', justifyContent: 'space-between' },
   footerText: { fontSize: 7, color: SLATE },
@@ -285,7 +299,7 @@ export function SKAFormD({ data }: { data: TradeDocData }) {
           <Text style={{ fontSize: 8, marginBottom: 4 }}>
             Berdasarkan ATIGA (ASEAN Trade In Goods Agreement) Chapter 3, barang di bawah ini dinyatakan berasal dari Indonesia:
           </Text>
-          <Text style={{ fontSize: 8, fontFamily: 'Helvetica-Bold', color: EMERALD }}>
+          <Text style={{ fontSize: 8, fontFamily: 'Roboto', fontWeight: 'bold', color: EMERALD }}>
             "The goods described herein originated in Indonesia and comply with the origin requirements specified for these goods in the ASEAN Trade in Goods Agreement (ATIGA)."
           </Text>
         </View>

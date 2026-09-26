@@ -1,14 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { guardApi, cleanText } from '@/lib/api-guard';
 import type { TradeDocData } from '@/lib/pdf/trade-docs';
-import 'pdfkit/standard-fonts/Helvetica';
-import 'pdfkit/standard-fonts/HelveticaBold';
-import 'pdfkit/standard-fonts/HelveticaOblique';
-import 'pdfkit/standard-fonts/HelveticaBoldOblique';
-import 'pdfkit/standard-fonts/Courier';
-import 'pdfkit/standard-fonts/CourierBold';
-import 'pdfkit/standard-fonts/TimesRoman';
-import 'pdfkit/standard-fonts/TimesBold';
 
 export const runtime = 'nodejs';
 
@@ -150,5 +142,4 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'Failed to generate PDF document', details: err instanceof Error ? err.stack || err.message : String(err) }, { status: 500 });
   }
 }
-
 
