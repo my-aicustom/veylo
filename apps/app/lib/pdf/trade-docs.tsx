@@ -287,7 +287,7 @@ export function SKAFormD({ data }: { data: TradeDocData }) {
 
         <View style={base.section}>
           <Text style={[base.sectionTitle, { color: EMERALD }]}>
-            ⚠️ DOKUMEN DRAFT — Untuk diproses & ditandatangani oleh Dinas Perdagangan / BKPM yang berwenang
+            [DRAFT] DOKUMEN DRAFT — Untuk diproses & ditandatangani oleh Dinas Perdagangan / BKPM yang berwenang
           </Text>
         </View>
 
