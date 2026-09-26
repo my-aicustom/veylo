@@ -12,6 +12,7 @@ test('all runtime API routes exist', () => {
     'apps/app/app/api/health/route.ts',
     'apps/app/app/api/intelligence/route.ts',
     'apps/app/app/api/invite/route.ts',
+    'apps/app/app/api/live-voice/route.ts',
     'apps/app/app/api/mediate/route.ts',
     'apps/app/app/api/ready/route.ts',
     'apps/app/app/api/simulate/route.ts',
@@ -382,4 +383,51 @@ test('consultation page has SSE hook, live badge, WA toast, and PDF export butto
   assert.ok(page.includes('wa-toast'));
   assert.ok(page.includes('export-fab'));
   assert.ok(page.includes('ExportModal'));
+});
+
+test('Gemini Live Voice route proxies realtimeInput and serverContent', () => {
+  const route = read('apps/app/app/api/live-voice/route.ts');
+  const prompts = read('apps/app/lib/ai/prompts.ts');
+  const pkg = JSON.parse(read('apps/app/package.json'));
+
+  assert.equal(pkg.dependencies.ws, '^8.21.3');
+  assert.equal(pkg.dependencies['@google/generative-ai'], '^0.24.1');
+  assert.equal(pkg.devDependencies['@types/ws'], '^8.18.1');
+  assert.ok(prompts.includes('tradeAdvisorVoiceSystem'));
+  assert.ok(route.includes('BidiGenerateContent'));
+  assert.ok(route.includes('GEMINI_API_KEY'));
+  assert.ok(route.includes('attachGeminiLiveProxy'));
+  assert.ok(route.includes('realtimeInput'));
+  assert.ok(route.includes('serverContent'));
+  assert.ok(route.includes('export async function GET'));
+  assert.ok(route.includes('export async function POST'));
+});
+
+test('VoiceOrb live mode streams microphone audio to live-voice WebSocket with fallback', () => {
+  const orb = read('apps/app/components/VoiceOrb.tsx');
+  const page = read('apps/app/app/consultation/page.tsx');
+
+  assert.ok(orb.includes("mode?: 'mock' | 'live'"));
+  assert.ok(orb.includes('apiUrl(path)'));
+  assert.ok(orb.includes("'/api/live-voice'"));
+  assert.ok(orb.includes('new WebSocket'));
+  assert.ok(orb.includes('audio/pcm;rate=16000'));
+  assert.ok(orb.includes('realtimeInput'));
+  assert.ok(orb.includes('onLiveNotice'));
+  assert.ok(page.includes('mode="live"'));
+  assert.ok(page.includes('Gemini Live'));
+  assert.ok(page.includes('Gemini fallback'));
+});
+
+test('trade-events n8n webhook fixture pushes classified panels into the app route', () => {
+  const workflow = JSON.parse(read('n8n-workflows/trade-events-webhook.json'));
+  const serialized = JSON.stringify(workflow);
+
+  assert.equal(workflow.name, 'Veylo Trade Events Webhook');
+  assert.ok(serialized.includes('veylo-trade-events'));
+  assert.ok(serialized.includes('/app/api/trade-events'));
+  assert.ok(serialized.includes('sessionId'));
+  for (const panel of ['route-map', 'tariff', 'compliance', 'market']) {
+    assert.ok(serialized.includes(panel), panel);
+  }
 });

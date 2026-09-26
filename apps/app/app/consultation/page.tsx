@@ -156,6 +156,7 @@ export default function ConsultationPage() {
   const [activeView, setActiveView] = React.useState<VisualCanvasView>('routes');
   const [activeRoute, setActiveRoute] = React.useState('singapore');
   const [notice, setNotice] = React.useState('Klik orb untuk mulai bicara, atau ketik prompt di bawah.');
+  const [geminiLiveStatus, setGeminiLiveStatus] = React.useState<'checking' | 'ready' | 'fallback'>('checking');
   const [showExport, setShowExport] = React.useState(false);
   const recorderRef = React.useRef<PhraseRecorder | null>(null);
   const streamRef = React.useRef<MediaStream | null>(null);
@@ -168,9 +169,27 @@ export default function ConsultationPage() {
     setActiveView(panel);
   }, []);
 
+  const handleLiveNotice = React.useCallback((message: string) => {
+    setNotice(message);
+    if (message.toLowerCase().includes('fallback')) setGeminiLiveStatus('fallback');
+  }, []);
+
   const { live, waToast } = useTradeEvents(sessionId, handlePanelSwitch);
 
   React.useEffect(() => { setProfile(loadProfile()); }, []);
+  React.useEffect(() => {
+    let cancelled = false;
+    fetch(apiUrl('/api/live-voice'), { cache: 'no-store' })
+      .then((response) => response.ok ? response.json() : null)
+      .then((data) => {
+        if (cancelled) return;
+        setGeminiLiveStatus(data?.configured ? 'ready' : 'fallback');
+      })
+      .catch(() => {
+        if (!cancelled) setGeminiLiveStatus('fallback');
+      });
+    return () => { cancelled = true; };
+  }, []);
   React.useEffect(() => () => {
     recorderRef.current?.stop();
     streamRef.current?.getTracks().forEach((track) => track.stop());
@@ -272,6 +291,12 @@ export default function ConsultationPage() {
           <span className={`live-badge ${live ? 'live-badge--on' : 'live-badge--off'}`} title={live ? 'WhatsApp sync aktif' : 'Menghubungkan...'}>
             {live ? '🔴 LIVE' : '⚪ SYNC'}
           </span>
+          <span
+            className={`live-badge ${geminiLiveStatus === 'ready' ? 'live-badge--on' : 'live-badge--off'}`}
+            title={geminiLiveStatus === 'ready' ? 'Gemini Live Voice siap' : 'Fallback ke rekaman lokal bila Gemini belum siap'}
+          >
+            {geminiLiveStatus === 'ready' ? 'Gemini Live' : geminiLiveStatus === 'checking' ? 'Gemini check' : 'Gemini fallback'}
+          </span>
           <div className="profile-chip">
             <strong>{profile?.name ?? 'Trade Guest'}</strong>
             <span>{profile ? `${profile.countryName} · ${profile.preferredLanguage.toUpperCase()}` : 'AI Trade Session'}</span>
@@ -288,7 +313,14 @@ export default function ConsultationPage() {
             <p>{notice}</p>
           </div>
 
-          <VoiceOrb status={status} amplitude={amplitude} onClick={toggleRecording} />
+          <VoiceOrb
+            status={status}
+            amplitude={amplitude}
+            mode="live"
+            onClick={toggleRecording}
+            onLiveStatus={setStatus}
+            onLiveNotice={handleLiveNotice}
+          />
 
           <div className="scenario-row" aria-label="Quick scenarios">
             {scenarios.map((scenario) => (

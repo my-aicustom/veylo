@@ -1,0 +1,104 @@
+{
+  "name": "Veylo Trade Events Webhook",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "veylo-trade-events",
+        "responseMode": "lastNode",
+        "options": {}
+      },
+      "id": "2b18d45f-2d6b-4f52-9de4-8bde2bb63c01",
+      "name": "Webhook Trigger",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        0,
+        0
+      ],
+      "webhookId": "veylo-trade-events"
+    },
+    {
+      "parameters": {
+        "jsCode": "const PANEL_RULES = [\n  {\n    panel: 'route-map',\n    keywords: ['rute', 'kapal', 'pelabuhan', 'cargo', 'shipping', 'freight'],\n  },\n  {\n    panel: 'tariff',\n    keywords: ['tarif', 'bea masuk', 'hs code', 'pajak', 'duty'],\n  },\n  {\n    panel: 'compliance',\n    keywords: ['syarat', 'dokumen', 'izin', 'bpom', 'karantina', 'ska'],\n  },\n  {\n    panel: 'market',\n    keywords: ['pasar', 'buyer', 'peluang', 'harga'],\n  },\n];\n\nfunction normalizePayload(json) {\n  if (json.body && typeof json.body === 'object' && !Array.isArray(json.body)) {\n    return json.body;\n  }\n\n  if (typeof json.body === 'string') {\n    try {\n      return JSON.parse(json.body);\n    } catch {\n      return { text: json.body };\n    }\n  }\n\n  return json;\n}\n\nfunction classify(payload) {\n  const text = [\n    payload.text,\n    payload.message,\n    payload.query,\n    payload.prompt,\n    payload.topic,\n    payload.description,\n    payload.panel,\n    payload.data,\n  ]\n    .map((value) => {\n      if (value == null) return '';\n      return typeof value === 'string' ? value : JSON.stringify(value);\n    })\n    .join(' ')\n    .toLowerCase();\n\n  const matchedRule = PANEL_RULES.find((rule) =>\n    rule.keywords.some((keyword) => text.includes(keyword)),\n  );\n\n  return matchedRule ? matchedRule.panel : 'route-map';\n}\n\nreturn items.map((item) => {\n  const payload = normalizePayload(item.json);\n  const query = item.json.query && typeof item.json.query === 'object' ? item.json.query : {};\n  const sessionId = payload.sessionId ?? payload.session_id ?? query.sessionId ?? query.session_id ?? '';\n\n  return {\n    json: {\n      sessionId,\n      panel: classify(payload),\n      data: payload.data ?? payload,\n    },\n  };\n});"
+      },
+      "id": "7ce3c9a8-539c-4f2c-9430-0f22f3edc97b",
+      "name": "Classify Topic",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        280,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://veylo-swart.vercel.app/app/api/trade-events",
+        "sendBody": true,
+        "contentType": "json",
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "sessionId",
+              "value": "={{ $json.sessionId }}"
+            },
+            {
+              "name": "panel",
+              "value": "={{ $json.panel }}"
+            },
+            {
+              "name": "data",
+              "value": "={{ $json.data }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "f7483494-e0f4-474c-9fa7-cb519727d8e3",
+      "name": "Push Trade Event",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        560,
+        0
+      ]
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Webhook Trigger": {
+      "main": [
+        [
+          {
+            "node": "Classify Topic",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Classify Topic": {
+      "main": [
+        [
+          {
+            "node": "Push Trade Event",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "timezone": "Asia/Jakarta"
+  },
+  "versionId": "d93bc841-4a61-402a-af57-03d265366c0b",
+  "meta": {
+    "templateCredsSetupCompleted": true
+  },
+  "id": "veylo-trade-events-webhook",
+  "tags": []
+}
