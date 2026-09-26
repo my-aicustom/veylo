@@ -35,6 +35,7 @@ const nextConfig = {
   poweredByHeader: false,
   productionBrowserSourceMaps: false,
   basePath,
+  serverExternalPackages: ['@react-pdf/renderer'],
   headers: async () => [{
     source: '/:path*',
     headers: securityHeaders,
