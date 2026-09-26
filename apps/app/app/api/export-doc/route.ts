@@ -16,6 +16,31 @@ const FILENAME: Record<DocType, string> = {
   'ska-form-d': 'veylo-ska-form-d',
 };
 
+const REACT_ELEMENT = Symbol.for('react.element');
+const TRANSITIONAL_ELEMENT = Symbol.for('react.transitional.element');
+
+function normalizeReactPdfElement(node: unknown): unknown {
+  if (!node || typeof node !== 'object') return node;
+  if (Array.isArray(node)) return node.map(normalizeReactPdfElement);
+
+  const obj = node as Record<string, unknown>;
+  const clone: Record<string, unknown> = { ...obj };
+
+  if (clone.$$typeof === TRANSITIONAL_ELEMENT || clone.$$typeof) {
+    clone.$$typeof = REACT_ELEMENT;
+  }
+
+  if (clone.props && typeof clone.props === 'object') {
+    const props: Record<string, unknown> = { ...(clone.props as Record<string, unknown>) };
+    if ('children' in props) {
+      props.children = normalizeReactPdfElement(props.children);
+    }
+    clone.props = props;
+  }
+
+  return clone;
+}
+
 async function renderDoc(type: DocType, data: TradeDocData): Promise<Uint8Array> {
   const { renderToBuffer } = await import('@react-pdf/renderer');
   const { CommercialInvoice, PackingList, SKAFormD } = await import('@/lib/pdf/trade-docs');
@@ -23,9 +48,12 @@ async function renderDoc(type: DocType, data: TradeDocData): Promise<Uint8Array>
   if (type === 'invoice') el = CommercialInvoice({ data });
   else if (type === 'packing-list') el = PackingList({ data });
   else el = SKAFormD({ data });
-  const buf = await renderToBuffer(el as any);
+
+  const normalized = normalizeReactPdfElement(el) as React.ReactElement;
+  const buf = await renderToBuffer(normalized as any);
   return new Uint8Array(buf.buffer, buf.byteOffset, buf.byteLength);
 }
+
 
 
 function sanitizeData(raw: unknown): TradeDocData {
