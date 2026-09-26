@@ -127,17 +127,17 @@ function ShipmentInfo({ data, invoiceNo }: { data: TradeDocData; invoiceNo?: str
     <View style={[base.section, base.row]}>
       <View style={base.col}>
         <Text style={base.sectionTitle}>Detail Pengiriman</Text>
-        <Text style={base.label}>Port Muat: <Text style={base.value}>{data.portOfLoading}</Text></Text>
-        <Text style={base.label}>Port Bongkar: <Text style={base.value}>{data.portOfDischarge}</Text></Text>
-        {data.vesselFlight && <Text style={base.label}>Kapal/Flight: <Text style={base.value}>{data.vesselFlight}</Text></Text>}
-        {data.blNumber && <Text style={base.label}>B/L Number: <Text style={base.value}>{data.blNumber}</Text></Text>}
+        <Text style={base.label}>Port Muat: {data.portOfLoading}</Text>
+        <Text style={base.label}>Port Bongkar: {data.portOfDischarge}</Text>
+        {data.vesselFlight && <Text style={base.label}>Kapal/Flight: {data.vesselFlight}</Text>}
+        {data.blNumber && <Text style={base.label}>B/L Number: {data.blNumber}</Text>}
       </View>
       <View style={base.col}>
         <Text style={base.sectionTitle}>Referensi Dokumen</Text>
-        <Text style={base.label}>No. Invoice: <Text style={base.value}>{invoiceNo ?? data.invoiceNumber ?? 'VTR-' + Date.now().toString().slice(-6)}</Text></Text>
-        <Text style={base.label}>Tanggal: <Text style={base.value}>{data.invoiceDate ?? today}</Text></Text>
-        <Text style={base.label}>Incoterms: <Text style={base.value}>{data.incoterms ?? 'FOB'}</Text></Text>
-        <Text style={base.label}>Negara Asal: <Text style={base.value}>{data.countryOfOrigin ?? 'Indonesia'}</Text></Text>
+        <Text style={base.label}>No. Invoice: {invoiceNo ?? data.invoiceNumber ?? 'VTR-' + Date.now().toString().slice(-6)}</Text>
+        <Text style={base.label}>Tanggal: {data.invoiceDate ?? today}</Text>
+        <Text style={base.label}>Incoterms: {data.incoterms ?? 'FOB'}</Text>
+        <Text style={base.label}>Negara Asal: {data.countryOfOrigin ?? 'Indonesia'}</Text>
       </View>
     </View>
   );
