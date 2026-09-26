@@ -20,9 +20,9 @@ async function renderDoc(type: DocType, data: TradeDocData): Promise<Uint8Array>
   const { renderToBuffer } = await import('@react-pdf/renderer');
   const { CommercialInvoice, PackingList, SKAFormD } = await import('@/lib/pdf/trade-docs');
   let el: React.ReactElement;
-  if (type === 'invoice') el = React.createElement(CommercialInvoice, { data });
-  else if (type === 'packing-list') el = React.createElement(PackingList, { data });
-  else el = React.createElement(SKAFormD, { data });
+  if (type === 'invoice') el = CommercialInvoice({ data });
+  else if (type === 'packing-list') el = PackingList({ data });
+  else el = SKAFormD({ data });
   const buf = await renderToBuffer(el as any);
   return new Uint8Array(buf.buffer, buf.byteOffset, buf.byteLength);
 }

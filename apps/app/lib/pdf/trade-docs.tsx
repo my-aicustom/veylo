@@ -161,9 +161,9 @@ export function CommercialInvoice({ data }: { data: TradeDocData }) {
   return (
     <Document title="Commercial Invoice — Veylo Trade Advisor">
       <Page size="A4" style={base.page}>
-        <DocHeader title="International Trade Document" docType="COMMERCIAL INVOICE" />
-        <Parties data={data} />
-        <ShipmentInfo data={data} />
+        {DocHeader({ title: 'International Trade Document', docType: 'COMMERCIAL INVOICE' })}
+        {Parties({ data })}
+        {ShipmentInfo({ data })}
 
         <View style={base.section}>
           <Text style={base.sectionTitle}>Rincian Barang / Description of Goods</Text>
@@ -200,7 +200,7 @@ export function CommercialInvoice({ data }: { data: TradeDocData }) {
           </View>
         )}
 
-        <DocFooter />
+        {DocFooter()}
       </Page>
     </Document>
   );
@@ -217,9 +217,9 @@ export function PackingList({ data }: { data: TradeDocData }) {
   return (
     <Document title="Packing List — Veylo Trade Advisor">
       <Page size="A4" style={base.page}>
-        <DocHeader title="International Trade Document" docType="PACKING LIST" />
-        <Parties data={data} />
-        <ShipmentInfo data={data} />
+        {DocHeader({ title: 'International Trade Document', docType: 'PACKING LIST' })}
+        {Parties({ data })}
+        {ShipmentInfo({ data })}
 
         <View style={base.section}>
           <Text style={base.sectionTitle}>Rincian Kemasan / Packing Details</Text>
@@ -254,7 +254,7 @@ export function PackingList({ data }: { data: TradeDocData }) {
           </View>
         </View>
 
-        <DocFooter />
+        {DocFooter()}
       </Page>
     </Document>
   );
@@ -269,7 +269,7 @@ export function SKAFormD({ data }: { data: TradeDocData }) {
   return (
     <Document title="SKA Form D — Veylo Trade Advisor">
       <Page size="A4" style={base.page}>
-        <DocHeader title="Certificate of Origin (ATIGA/ASEAN Trade in Goods Agreement)" docType="FORM D — SKA" />
+        {DocHeader({ title: 'Certificate of Origin (ATIGA/ASEAN Trade in Goods Agreement)', docType: 'FORM D — SKA' })}
 
         <View style={base.section}>
           <Text style={[base.sectionTitle, { color: EMERALD }]}>
@@ -277,8 +277,8 @@ export function SKAFormD({ data }: { data: TradeDocData }) {
           </Text>
         </View>
 
-        <Parties data={data} />
-        <ShipmentInfo data={data} />
+        {Parties({ data })}
+        {ShipmentInfo({ data })}
 
         <View style={base.section}>
           <Text style={base.sectionTitle}>Kriteria Asal Barang / Origin Criteria</Text>
@@ -333,7 +333,7 @@ export function SKAFormD({ data }: { data: TradeDocData }) {
           </View>
         </View>
 
-        <DocFooter />
+        {DocFooter()}
       </Page>
     </Document>
   );
