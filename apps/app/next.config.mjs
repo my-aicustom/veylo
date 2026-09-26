@@ -35,7 +35,10 @@ const nextConfig = {
   poweredByHeader: false,
   productionBrowserSourceMaps: false,
   basePath,
-  serverExternalPackages: ['@react-pdf/renderer'],
+  serverExternalPackages: ['@react-pdf/renderer', 'pdfkit'],
+  outputFileTracingIncludes: {
+    '/api/export-doc': ['./node_modules/pdfkit/js/standard-fonts/**/*'],
+  },
   headers: async () => [{
     source: '/:path*',
     headers: securityHeaders,
