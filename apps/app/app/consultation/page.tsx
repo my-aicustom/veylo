@@ -6,6 +6,7 @@ import { VisualCanvas, type VisualCanvasView } from '@/components/VisualCanvas';
 import { VoiceOrb, type VoiceOrbProps } from '@/components/VoiceOrb';
 import { playSpeech, transcribe } from '@/lib/client-ai';
 import { loadProfile } from '@/lib/profile';
+import { apiUrl } from '@/lib/paths';
 import { PhraseRecorder, type Phrase } from '@/lib/wav-recorder';
 import type { Profile } from '@/lib/types';
 
@@ -36,7 +37,7 @@ function useTradeEvents(sessionId: string, onPanel: (panel: VisualCanvasView) =>
   const [waToast, setWaToast] = React.useState<string | null>(null);
 
   React.useEffect(() => {
-    const es = new EventSource(`/api/trade-events?sessionId=${encodeURIComponent(sessionId)}`);
+    const es = new EventSource(apiUrl(`/api/trade-events?sessionId=${encodeURIComponent(sessionId)}`));
 
     es.addEventListener('connected', () => setLive(true));
 
@@ -77,7 +78,7 @@ function ExportModal({ onClose }: { onClose: () => void }) {
     setLoading(type);
     setError(null);
     try {
-      const res = await fetch('/api/export-doc', {
+      const res = await fetch(apiUrl('/api/export-doc'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
