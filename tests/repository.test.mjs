@@ -347,3 +347,39 @@ test('production infrastructure has a static validator gate', () => {
   assert.ok(infra.includes('Real IP overwritten from socket peer'));
   assert.ok(ci.includes('pnpm infra:check:template'));
 });
+
+test('export-doc API route generates all three trade document types', () => {
+  const route = read('apps/app/app/api/export-doc/route.ts');
+  assert.ok(route.includes("'invoice'"));
+  assert.ok(route.includes("'packing-list'"));
+  assert.ok(route.includes("'ska-form-d'"));
+  assert.ok(route.includes('renderToBuffer'));
+  assert.ok(route.includes('application/pdf'));
+});
+
+test('trade-events SSE endpoint supports GET subscribe and POST push', () => {
+  const route = read('apps/app/app/api/trade-events/route.ts');
+  assert.ok(route.includes('text/event-stream'));
+  assert.ok(route.includes('sessionId'));
+  assert.ok(route.includes('canvas-switch'));
+  assert.ok(route.includes('ReadableStream'));
+});
+
+test('PDF trade document templates include all three doc types with branding', () => {
+  const tpl = read('apps/app/lib/pdf/trade-docs.tsx');
+  assert.ok(tpl.includes('CommercialInvoice'));
+  assert.ok(tpl.includes('PackingList'));
+  assert.ok(tpl.includes('SKAFormD'));
+  assert.ok(tpl.includes('my-aicustom.com'));
+  assert.ok(tpl.includes('0D9488'));
+});
+
+test('consultation page has SSE hook, live badge, WA toast, and PDF export button', () => {
+  const page = read('apps/app/app/consultation/page.tsx');
+  assert.ok(page.includes('useTradeEvents'));
+  assert.ok(page.includes('trade-events'));
+  assert.ok(page.includes('live-badge'));
+  assert.ok(page.includes('wa-toast'));
+  assert.ok(page.includes('export-fab'));
+  assert.ok(page.includes('ExportModal'));
+});

@@ -29,6 +29,123 @@ const opening: AdvisorTurn = {
   route: 'singapore',
 };
 
+// ─── SSE Hook ─────────────────────────────────────────────────────────────────
+
+function useTradeEvents(sessionId: string, onPanel: (panel: VisualCanvasView) => void) {
+  const [live, setLive] = React.useState(false);
+  const [waToast, setWaToast] = React.useState<string | null>(null);
+
+  React.useEffect(() => {
+    const es = new EventSource(`/api/trade-events?sessionId=${encodeURIComponent(sessionId)}`);
+
+    es.addEventListener('connected', () => setLive(true));
+
+    es.addEventListener('canvas-switch', (e: MessageEvent) => {
+      try {
+        const data = JSON.parse(e.data) as { panel: VisualCanvasView; source?: string };
+        onPanel(data.panel);
+        if (data.source === 'whatsapp') {
+          setWaToast(`📱 WhatsApp terhubung — menampilkan data ${data.panel}`);
+          setTimeout(() => setWaToast(null), 4000);
+        }
+      } catch { /* ignore malformed */ }
+    });
+
+    es.onerror = () => setLive(false);
+
+    return () => { es.close(); setLive(false); };
+  }, [sessionId, onPanel]);
+
+  return { live, waToast };
+}
+
+// ─── PDF Export Modal ─────────────────────────────────────────────────────────
+
+type DocType = 'invoice' | 'packing-list' | 'ska-form-d';
+
+const DOC_OPTIONS: { type: DocType; label: string; icon: string }[] = [
+  { type: 'invoice',      label: 'Commercial Invoice',  icon: '📋' },
+  { type: 'packing-list', label: 'Packing List',        icon: '📦' },
+  { type: 'ska-form-d',   label: 'SKA Form D (ATIGA)',  icon: '📜' },
+];
+
+function ExportModal({ onClose }: { onClose: () => void }) {
+  const [loading, setLoading] = React.useState<DocType | null>(null);
+  const [error, setError] = React.useState<string | null>(null);
+
+  async function download(type: DocType) {
+    setLoading(type);
+    setError(null);
+    try {
+      const res = await fetch('/api/export-doc', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          type,
+          data: {
+            exporterName: 'PT. Veylo Trade Indonesia',
+            exporterAddress: 'Jl. Sudirman No. 1, Jakarta Selatan 12190, Indonesia',
+            importerName: 'Importer International Ltd.',
+            importerAddress: '1 Trade Boulevard, Singapore 018989',
+            importerCountry: 'Singapore',
+            portOfLoading: 'Tanjung Priok, Jakarta',
+            portOfDischarge: 'Port of Singapore',
+            incoterms: 'FOB',
+            countryOfOrigin: 'Indonesia',
+            items: [
+              { description: 'Kopi Arabika/Robusta Biji Mentah', hsCode: '0901.11', qty: 5000, unit: 'kg', unitPrice: 4.20, currency: 'USD', grossWeightKg: 5250, netWeightKg: 5000, cbm: 8.5, cartons: 200 },
+              { description: 'Biji Kakao / Cocoa Beans', hsCode: '1801.00', qty: 3000, unit: 'kg', unitPrice: 3.80, currency: 'USD', grossWeightKg: 3150, netWeightKg: 3000, cbm: 5.2, cartons: 120 },
+            ],
+          },
+        }),
+      });
+      if (!res.ok) { setError('Gagal generate PDF. Coba lagi.'); return; }
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = res.headers.get('Content-Disposition')?.split('filename="')[1]?.replace('"', '') ?? `veylo-${type}.pdf`;
+      a.click();
+      URL.revokeObjectURL(url);
+    } catch {
+      setError('Koneksi gagal. Coba lagi.');
+    } finally {
+      setLoading(null);
+    }
+  }
+
+  return (
+    <div className="export-modal-overlay" role="dialog" aria-modal="true" aria-label="Ekspor Dokumen Perdagangan">
+      <div className="export-modal">
+        <div className="export-modal-header">
+          <h2>📄 Ekspor Dokumen</h2>
+          <button type="button" aria-label="Tutup" onClick={onClose}>✕</button>
+        </div>
+        <p className="export-modal-desc">Generate dokumen ekspor resmi sebagai PDF siap unduh. Data diisi otomatis dari sesi konsultasi.</p>
+        {error && <p className="export-modal-error">{error}</p>}
+        <div className="export-modal-options">
+          {DOC_OPTIONS.map(({ type, label, icon }) => (
+            <button
+              key={type}
+              type="button"
+              className="export-doc-btn"
+              disabled={loading !== null}
+              onClick={() => void download(type)}
+            >
+              <span className="export-doc-icon">{loading === type ? '⏳' : icon}</span>
+              <span>{label}</span>
+              {loading === type && <span className="export-loading">Generating...</span>}
+            </button>
+          ))}
+        </div>
+        <p className="export-modal-note">⚠️ Dokumen ini adalah draft — validasi dan tandatangan resmi diperlukan untuk kepabeanan.</p>
+      </div>
+    </div>
+  );
+}
+
+// ─── Page ─────────────────────────────────────────────────────────────────────
+
 export default function ConsultationPage() {
   const [profile, setProfile] = React.useState<Profile | null>(null);
   const [status, setStatus] = React.useState<VoiceStatus>('idle');
@@ -38,9 +155,19 @@ export default function ConsultationPage() {
   const [activeView, setActiveView] = React.useState<VisualCanvasView>('routes');
   const [activeRoute, setActiveRoute] = React.useState('singapore');
   const [notice, setNotice] = React.useState('Klik orb untuk mulai bicara, atau ketik prompt di bawah.');
+  const [showExport, setShowExport] = React.useState(false);
   const recorderRef = React.useRef<PhraseRecorder | null>(null);
   const streamRef = React.useRef<MediaStream | null>(null);
   const busyRef = React.useRef(false);
+
+  // Stable session ID per page mount
+  const sessionId = React.useRef(`veylo-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`).current;
+
+  const handlePanelSwitch = React.useCallback((panel: VisualCanvasView) => {
+    setActiveView(panel);
+  }, []);
+
+  const { live, waToast } = useTradeEvents(sessionId, handlePanelSwitch);
 
   React.useEffect(() => { setProfile(loadProfile()); }, []);
   React.useEffect(() => () => {
@@ -129,9 +256,21 @@ export default function ConsultationPage() {
 
   return (
     <main className="consultation-shell">
+      {/* Toast */}
+      {waToast && (
+        <div className="wa-toast" role="status" aria-live="polite">{waToast}</div>
+      )}
+
+      {/* PDF Export Modal */}
+      {showExport && <ExportModal onClose={() => setShowExport(false)} />}
+
       <header className="consultation-header">
         <BrandMark href="/" />
         <div className="consultation-actions">
+          {/* SSE live indicator */}
+          <span className={`live-badge ${live ? 'live-badge--on' : 'live-badge--off'}`} title={live ? 'WhatsApp sync aktif' : 'Menghubungkan...'}>
+            {live ? '🔴 LIVE' : '⚪ SYNC'}
+          </span>
           <div className="profile-chip">
             <strong>{profile?.name ?? 'Trade Guest'}</strong>
             <span>{profile ? `${profile.countryName} · ${profile.preferredLanguage.toUpperCase()}` : 'AI Trade Session'}</span>
@@ -179,6 +318,17 @@ export default function ConsultationPage() {
           <VisualCanvas activeView={activeView} activeRoute={activeRoute} onViewChange={setActiveView} />
         </aside>
       </section>
+
+      {/* Floating PDF Export Button */}
+      <button
+        type="button"
+        className="export-fab"
+        aria-label="Ekspor Dokumen Perdagangan"
+        onClick={() => setShowExport(true)}
+        title="Generate Commercial Invoice, Packing List, atau SKA Form D"
+      >
+        📄 Ekspor Dokumen
+      </button>
     </main>
   );
 }

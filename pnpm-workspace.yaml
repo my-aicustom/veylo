@@ -1,5 +1,9 @@
 packages:
   - 'apps/*'
 minimumReleaseAge: 10080
+minimumReleaseAgeExclude:
+  - smol-toml
+  - undici
+  - unifont
 trustPolicy: no-downgrade
 blockExoticSubdeps: true

@@ -461,3 +461,32 @@ h1 { margin: 0; font-size: clamp(42px, 7vw, 92px); line-height: .95; letter-spac
 .diagnostics-hero .hero-actions { display:flex; flex-wrap:wrap; gap:12px; align-items:center; margin-top:28px; }
 .diagnostics-hero .hero-actions .primary { margin-top:0; }
 @media (max-width: 640px) { .diagnostics-hero .hero-actions { align-items:stretch; flex-direction:column; } .diagnostics-hero .hero-actions button { width:100%; } }
+
+/* ─── PDF Export FAB ──────────────────────────────────────────────────── */
+.export-fab { position:fixed; bottom:28px; right:28px; z-index:50; background:var(--accent); color:var(--accent-ink); font-size:13px; font-weight:700; padding:12px 20px; border:none; border-radius:999px; box-shadow:0 4px 20px rgba(217,255,99,.35); transition:transform .15s,box-shadow .15s; cursor:pointer; }
+.export-fab:hover { transform:translateY(-2px); box-shadow:0 8px 28px rgba(217,255,99,.45); }
+
+/* ─── Export Modal ──────────────────────────────────────────────────────── */
+.export-modal-overlay { position:fixed; inset:0; z-index:100; background:rgba(0,0,0,.65); backdrop-filter:blur(6px); display:flex; align-items:center; justify-content:center; padding:20px; }
+.export-modal { background:var(--panel); border:1px solid var(--line); border-radius:20px; padding:28px; max-width:440px; width:100%; box-shadow:0 20px 60px rgba(0,0,0,.5); }
+.export-modal-header { display:flex; align-items:center; justify-content:space-between; margin-bottom:10px; }
+.export-modal-header h2 { font-size:18px; margin:0; }
+.export-modal-header button { background:none; border:none; color:var(--muted); font-size:18px; padding:4px 8px; border-radius:8px; line-height:1; }
+.export-modal-header button:hover { color:var(--text); background:var(--panel-2); }
+.export-modal-desc { font-size:13px; color:var(--muted); margin:0 0 16px; }
+.export-modal-error { font-size:13px; color:var(--danger); margin:0 0 12px; background:rgba(246,109,109,.1); padding:8px 12px; border-radius:8px; }
+.export-modal-options { display:flex; flex-direction:column; gap:10px; margin-bottom:16px; }
+.export-doc-btn { display:flex; align-items:center; gap:12px; background:var(--panel-2); border:1px solid var(--line); color:var(--text); padding:14px 16px; border-radius:12px; text-align:left; font-size:14px; font-weight:500; transition:background .15s,border-color .15s; }
+.export-doc-btn:hover:not(:disabled) { background:var(--line); border-color:var(--accent); }
+.export-doc-icon { font-size:20px; flex-shrink:0; }
+.export-loading { margin-left:auto; font-size:11px; color:var(--muted); }
+.export-modal-note { font-size:11px; color:var(--soft); margin:0; line-height:1.5; }
+
+/* ─── SSE Live Badge ────────────────────────────────────────────────────── */
+.live-badge { font-size:11px; font-weight:700; padding:4px 10px; border-radius:999px; letter-spacing:.05em; }
+.live-badge--on  { background:rgba(217,255,99,.15); color:var(--accent); border:1px solid rgba(217,255,99,.3); }
+.live-badge--off { background:var(--panel-2); color:var(--soft); border:1px solid var(--line); }
+
+/* ─── WhatsApp Toast ────────────────────────────────────────────────────── */
+.wa-toast { position:fixed; top:20px; left:50%; transform:translateX(-50%); z-index:200; background:#128C7E; color:#fff; font-size:13px; font-weight:600; padding:10px 20px; border-radius:999px; box-shadow:0 4px 20px rgba(18,140,126,.4); animation:slideDown .3s ease; white-space:nowrap; }
+@keyframes slideDown { from { opacity:0; transform:translateX(-50%) translateY(-10px); } to { opacity:1; transform:translateX(-50%) translateY(0); } }
