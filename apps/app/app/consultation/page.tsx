@@ -105,7 +105,7 @@ function ExportModal({ onClose }: { onClose: () => void }) {
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
-      a.download = res.headers.get('Content-Disposition')?.split('filename="')[1]?.replace('"', '') ?? `veylo-${type}.pdf`;
+      a.download = res.headers.get('Content-Disposition')?.split('filename="')[1]?.replace(/"/g, '') ?? `veylo-${type}.pdf`;
       a.click();
       URL.revokeObjectURL(url);
     } catch {

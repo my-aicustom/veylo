@@ -5,6 +5,11 @@
   "description": "Veylo internal multilingual communication: Astro marketing site + self-hosted LiveKit application + OpenRouter interpretation.",
   "license": "Apache-2.0",
   "packageManager": "pnpm@10.18.2",
+  "pnpm": {
+    "overrides": {
+      "pdfkit": "0.20.2"
+    }
+  },
   "engines": {
     "node": ">=20"
   },
