@@ -2,9 +2,9 @@
 
 import * as React from 'react';
 import { useRouter } from 'next/navigation';
-import { ProfileForm } from '@/components/ProfileForm';
 import { BrandMark } from '@/components/BrandMark';
 import { VoiceOrb } from '@/components/VoiceOrb';
+import { VisualCanvas, type VisualCanvasView } from '@/components/VisualCanvas';
 import { loadProfile } from '@/lib/profile';
 import { apiUrl } from '@/lib/paths';
 import type { Profile } from '@/lib/types';
@@ -59,29 +59,11 @@ export default function HomePage() {
   const [joinValue, setJoinValue] = React.useState('');
   const [creating, setCreating] = React.useState(false);
   const [roomError, setRoomError] = React.useState('');
+  const [canvasView, setCanvasView] = React.useState<VisualCanvasView>('routes');
+  const [canvasRoute, setCanvasRoute] = React.useState('singapore');
 
   React.useEffect(() => { setProfile(loadProfile()); setChecked(true); }, []);
   if (!checked) return <main className="center-screen">Loading…</main>;
-
-  if (!profile) {
-    return (
-      <main className="landing-shell">
-        <header className="landing-header"><BrandMark /><span>Veylo Trade AI Advisor</span></header>
-        <section className="home-hero">
-          <div className="eyebrow">VEYLO TRADE AI ADVISOR</div>
-          <h1>Choose your export command center.</h1>
-          <p className="lede">Masuk lewat suara native ala Jarvis atau chat WhatsApp resmi untuk konsultasi ekspor, impor, tarif HS Code, rute kargo, dan kesiapan dokumen.</p>
-        </section>
-        <DualEntryCards onVoice={() => router.push('/consultation')} />
-        <section className="onboarding-wrap onboarding-compact">
-          <div className="eyebrow">LIVE CALL PROFILE</div>
-          <h2>Siapkan profil untuk mode panggilan.</h2>
-          <p className="lede">Live Call, Face-to-Face, dan AI Simulation memakai profil ini untuk konteks negara dan bahasa.</p>
-          <ProfileForm onDone={setProfile} />
-        </section>
-      </main>
-    );
-  }
 
   async function createConversation() {
     if (creating) return;
@@ -133,26 +115,91 @@ export default function HomePage() {
     <main className="landing-shell">
       <header className="landing-header">
         <BrandMark />
-        <div className="profile-chip"><strong>{profile.name}</strong><span>{profile.countryName} · {profile.preferredLanguage.toUpperCase()}</span></div>
+        <nav className="mode-nav" aria-label="Quick navigation">
+          <a href="/app" className="mode-nav-btn active">🌐 Trade Command</a>
+          <a href="/app/consultation" className="mode-nav-btn">🎙️ Voice Advisor</a>
+          <a href="/app/face-to-face" className="mode-nav-btn">🤝 Face-to-Face</a>
+          <a href="/app/simulation" className="mode-nav-btn">🎭 AI Simulation</a>
+        </nav>
+        <div className="profile-chip">
+          <strong>{profile?.name ?? 'Trade Guest'}</strong>
+          <span>{profile ? `${profile.countryName} · ${profile.preferredLanguage.toUpperCase()}` : 'Global Trader'}</span>
+        </div>
       </header>
+
       <section className="home-hero">
         <div className="eyebrow">VEYLO TRADE AI ADVISOR</div>
         <h1>Choose your export command center.</h1>
         <p className="lede">Masuk lewat suara native ala Jarvis atau chat WhatsApp resmi untuk konsultasi ekspor, impor, tarif HS Code, rute kargo, dan kesiapan dokumen.</p>
       </section>
+
       <DualEntryCards onVoice={() => router.push('/consultation')} />
-      <section className="mode-grid">
+
+      {/* Live Visual Canvas Showcase */}
+      <section className="home-canvas-showcase" aria-label="Trade Intelligence Board">
+        <div className="section-header">
+          <div className="eyebrow">LIVE TRADE RADAR & SIMULATOR</div>
+          <h2>Peta Rute Kargo, Tarif HS Code, & Radar Kepatuhan</h2>
+          <p className="lede" style={{ marginTop: '8px', fontSize: '15px' }}>
+            Eksplorasi koridor logistik maritim Tanjung Priok/Perak ke pelabuhan dunia, hitung tarif bea masuk komoditas unggulan, dan verifikasi sertifikasi ekspor secara interaktif.
+          </p>
+        </div>
+
+        <VisualCanvas
+          activeView={canvasView}
+          activeRoute={canvasRoute}
+          onViewChange={setCanvasView}
+        />
+
+        <div className="home-canvas-banner">
+          <div>
+            <p><strong>Konsultasi Suara Dua Arah & Generator PDF Kepabeanan Resmi</strong></p>
+            <p>Bicara langsung dengan AI ekspor atau cetak Commercial Invoice, Packing List, & SKA Form D siap pakai.</p>
+          </div>
+          <button
+            type="button"
+            className="primary"
+            onClick={() => router.push('/consultation')}
+            style={{ whiteSpace: 'nowrap' }}
+          >
+            Buka Fullscreen Voice Advisor →
+          </button>
+        </div>
+      </section>
+
+      <section className="mode-grid" style={{ marginTop: '48px' }}>
         <article className="mode-card primary-mode">
-          <span>01</span><h2>Live Call</h2><p>Create an internal video room and invite anyone with a signed link.</p>
+          <span>01</span>
+          <h2>Live Call</h2>
+          <p>Create an internal video room and invite anyone with a signed link. (Requires LiveKit SFU server).</p>
           <button className="primary" onClick={createConversation} disabled={creating}>
             {creating ? 'Creating…' : 'Create conversation'}
           </button>
-          <div className="join-line"><input value={joinValue} onChange={(e) => setJoinValue(e.target.value)} placeholder="Invite link or room code" onKeyDown={(e) => e.key === 'Enter' && join()} /><button className="ghost" onClick={join}>Join</button></div>
+          <div className="join-line">
+            <input
+              value={joinValue}
+              onChange={(e) => setJoinValue(e.target.value)}
+              placeholder="Invite link or room code"
+              onKeyDown={(e) => e.key === 'Enter' && join()}
+            />
+            <button className="ghost" onClick={join}>Join</button>
+          </div>
           {roomError && <div className="error-box">{roomError}</div>}
         </article>
-        <article className="mode-card"><span>02</span><h2>Face-to-Face</h2><p>Use one device as an interpreter between two people, with external-mic and headset routing support.</p><button className="ghost" onClick={() => router.push('/face-to-face')}>Open mode</button></article>
-        <article className="mode-card"><span>03</span><h2>AI Simulation</h2><p>Practice a business conversation with an AI counterpart from any country.</p><button className="ghost" onClick={() => router.push('/simulation')}>Open mode</button></article>
+        <article className="mode-card">
+          <span>02</span>
+          <h2>Face-to-Face</h2>
+          <p>Use one device as an interpreter between two people, with external-mic and headset routing support.</p>
+          <button className="ghost" onClick={() => router.push('/face-to-face')}>Open mode</button>
+        </article>
+        <article className="mode-card">
+          <span>03</span>
+          <h2>AI Simulation</h2>
+          <p>Practice a business conversation with an AI counterpart from any country.</p>
+          <button className="ghost" onClick={() => router.push('/simulation')}>Open mode</button>
+        </article>
       </section>
+
       <footer className="home-footer">
         <span>Self-hosted communication</span>
         <span>OpenRouter inference</span>

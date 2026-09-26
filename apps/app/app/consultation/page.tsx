@@ -285,7 +285,13 @@ export default function ConsultationPage() {
       {showExport && <ExportModal onClose={() => setShowExport(false)} />}
 
       <header className="consultation-header">
-        <BrandMark href="/" />
+        <BrandMark href="/app" />
+        <nav className="mode-nav" aria-label="Mode switcher">
+          <a href="/app" className="mode-nav-btn">🌐 Trade Command</a>
+          <a href="/app/consultation" className="mode-nav-btn active">🎙️ Voice Advisor</a>
+          <a href="/app/face-to-face" className="mode-nav-btn">🤝 Face-to-Face</a>
+          <a href="/app/simulation" className="mode-nav-btn">🎭 AI Simulation</a>
+        </nav>
         <div className="consultation-actions">
           {/* SSE live indicator */}
           <span className={`live-badge ${live ? 'live-badge--on' : 'live-badge--off'}`} title={live ? 'WhatsApp sync aktif' : 'Menghubungkan...'}>

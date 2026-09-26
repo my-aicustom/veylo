@@ -13,12 +13,12 @@ const contentSecurityPolicy = [
   "form-action 'self'",
   "frame-ancestors 'none'",
   "object-src 'none'",
-  "img-src 'self' data: blob:",
-  "media-src 'self' data: blob:",
-  "font-src 'self' data:",
+  "img-src 'self' data: blob: https:",
+  "media-src 'self' data: blob: https:",
+  "font-src 'self' data: https:",
   "style-src 'self' 'unsafe-inline'",
   `script-src 'self' 'unsafe-inline'${isProduction ? '' : " 'unsafe-eval'"}`,
-  "connect-src 'self' ws: wss:",
+  "connect-src 'self' ws: wss: https:",
   "worker-src 'self' blob:",
 ].join('; ');
 
@@ -42,6 +42,14 @@ const nextConfig = {
   basePath,
   serverExternalPackages: ['@react-pdf/renderer', 'pdfkit'],
   outputFileTracingRoot: path.join(__dirname, '../../'),
+  redirects: async () => [
+    {
+      source: '/',
+      destination: '/app',
+      basePath: false,
+      permanent: false,
+    },
+  ],
   headers: async () => [{
     source: '/:path*',
     headers: securityHeaders,

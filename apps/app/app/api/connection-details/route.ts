@@ -15,7 +15,15 @@ export async function POST(request: NextRequest) {
 
   try {
     if (!LIVEKIT_URL || !API_KEY || !API_SECRET) {
-      return NextResponse.json({ error: 'LiveKit server configuration is incomplete.' }, { status: 500 });
+      return NextResponse.json(
+        {
+          error: 'LiveKit SFU Server belum dikonfigurasi di environment ini.',
+          configured: false,
+          code: 'LIVEKIT_NOT_CONFIGURED',
+          message: 'Fitur 1-on-1 Video Call memerlukan server LiveKit (LIVEKIT_URL, LIVEKIT_API_KEY, LIVEKIT_API_SECRET). Di Vercel, tambahkan variabel ini atau gunakan LiveKit Cloud gratis.',
+        },
+        { status: 503 }
+      );
     }
 
     const body = await request.json();

@@ -24,6 +24,7 @@ import { apiUrl } from '@/lib/paths';
 import type { ConnectionDetails, Profile } from '@/lib/types';
 
 export function RoomPageClient({ roomName }: { roomName: string }) {
+  const router = useRouter();
   const [profile, setProfile] = React.useState<Profile | null>(null);
   const [profileChecked, setProfileChecked] = React.useState(false);
   const [choices, setChoices] = React.useState<LocalUserChoices | null>(null);
@@ -59,7 +60,11 @@ export function RoomPageClient({ roomName }: { roomName: string }) {
     const payload = await response.json();
     if (!response.ok) {
       setChoices(null);
-      setError(payload?.error || 'Could not join room');
+      if (payload?.code === 'LIVEKIT_NOT_CONFIGURED' || payload?.error?.toLowerCase().includes('livekit')) {
+        setError('LIVEKIT_NOT_CONFIGURED');
+      } else {
+        setError(payload?.error || 'Could not join room');
+      }
       return;
     }
     setConnection(payload);
@@ -90,7 +95,25 @@ export function RoomPageClient({ roomName }: { roomName: string }) {
           <div className="eyebrow">ROOM / {roomName}</div>
           <h1>Ready to join?</h1>
           <p>Check your camera and microphone. AI interpretation starts automatically after you enter.</p>
-          {error && <div className="error-box">{error}</div>}
+          {error === 'LIVEKIT_NOT_CONFIGURED' ? (
+            <div className="livekit-notice-card">
+              <div className="livekit-notice-badge">⚠️ LiveKit SFU Belum Terhubung</div>
+              <h3>Server Video Call Memerlukan LiveKit</h3>
+              <p>
+                Mode Panggilan Video 1-on-1 membutuhkan WebRTC SFU Server. Variabel lingkungan <code>LIVEKIT_URL</code>, <code>LIVEKIT_API_KEY</code>, dan <code>LIVEKIT_API_SECRET</code> belum disetel di Vercel.
+              </p>
+              <div className="livekit-notice-actions">
+                <button type="button" className="primary" onClick={() => router.push('/consultation')}>
+                  Buka Trade AI Advisor (Voice & Canvas) →
+                </button>
+                <a href="https://cloud.livekit.io" target="_blank" rel="noreferrer" className="ghost">
+                  Daftar LiveKit Cloud Gratis (50GB) ↗
+                </a>
+              </div>
+            </div>
+          ) : error ? (
+            <div className="error-box">{error}</div>
+          ) : null}
           <PreJoin
             defaults={{ username: profile.name, videoEnabled: true, audioEnabled: true }}
             onSubmit={join}
