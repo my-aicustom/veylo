@@ -13,3 +13,5 @@ coverage
 *.tsbuildinfo
 .local-livekit/
 .playwright-cli/
+
+.vercel

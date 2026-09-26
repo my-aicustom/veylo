@@ -119,6 +119,30 @@ test('public homepage still exposes all three conversation modes', () => {
   for (const label of ['Live Call', 'Face-to-Face', 'AI Simulation']) assert.ok(homepage.includes(label));
 });
 
+test('trade advisor dual-entry, voice consultation, and my-aicustom branding are wired', () => {
+  assert.ok(fs.existsSync(path.join(root, 'apps/app/public/my-aicustom-logo.webp')));
+
+  const brand = read('apps/app/components/BrandMark.tsx');
+  const home = read('apps/app/app/page.tsx');
+  const voiceOrb = read('apps/app/components/VoiceOrb.tsx');
+  const visualCanvas = read('apps/app/components/VisualCanvas.tsx');
+  const consultation = read('apps/app/app/consultation/page.tsx');
+
+  assert.ok(brand.includes('Powered by my-aicustom'));
+  assert.ok(brand.includes('https://my-aicustom.com'));
+  assert.ok(home.includes('Konsultasi Suara Interaktif'));
+  assert.ok(home.includes('/consultation'));
+  assert.ok(home.includes('https://wa.me/6289660152525'));
+  assert.ok(home.includes('Live Call'));
+  assert.ok(voiceOrb.includes("status: 'idle' | 'listening' | 'thinking' | 'speaking'"));
+  assert.ok(visualCanvas.includes('Tanjung Priok'));
+  assert.ok(visualCanvas.includes('HS 0901.11'));
+  assert.ok(visualCanvas.includes('Export Ready'));
+  assert.ok(consultation.includes('PhraseRecorder'));
+  assert.ok(consultation.includes('Chat via WhatsApp'));
+  assert.ok(consultation.includes('VisualCanvas'));
+});
+
 
 test('original business-meeting intelligence scope is implemented', () => {
   const route = read('apps/app/app/api/intelligence/route.ts');

@@ -247,7 +247,7 @@ export default function DiagnosticsPage() {
           <Diag label="LiveKit secret" value={Boolean(config.livekitApiSecret)} />
           <Diag label="LiveKit URL" value={Boolean(config.livekitUrl)} />
           <Diag label="Secure WSS" value={Boolean(config.livekitSecure)} />
-          <p className="diag-note">Local ws:// is valid for development. Production should expose browser-reachable wss://.</p>
+          <p className="diag-note">Local insecure WebSocket URLs are valid for development. Production should expose browser-reachable secure WebSocket URLs.</p>
         </article>
 
         <article className="diag-card">

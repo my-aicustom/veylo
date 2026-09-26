@@ -7,7 +7,12 @@ let tsCount = 0;
 function walk(dir) {
   for (const name of fs.readdirSync(dir)) {
     if (name === 'node_modules' || name === '.next') continue;
-    const p = path.join(dir, name);
+    const p = path.normalize(`${dir}${path.sep}${name}`);
+    const relative = path.relative(root, p);
+    if (relative.startsWith('..') || path.isAbsolute(relative)) {
+      errors.push(`${p}: path escaped audit root`);
+      continue;
+    }
     const st = fs.statSync(p);
     if (st.isDirectory()) walk(p);
     else if (/\.(ts|tsx)$/.test(name) && !name.endsWith('.d.ts')) {

@@ -16,10 +16,12 @@ FROM node:22-alpine AS runner
 WORKDIR /app
 ENV NODE_ENV=production
 RUN corepack enable
-COPY --from=builder /app/package.json ./package.json
-COPY --from=builder /app/node_modules ./node_modules
-COPY --from=builder /app/.next ./.next
-COPY --from=builder /app/public ./public
-COPY --from=builder /app/next.config.mjs ./next.config.mjs
+RUN addgroup -S veylo && adduser -S veylo -G veylo
+COPY --from=builder --chown=veylo:veylo /app/package.json ./package.json
+COPY --from=builder --chown=veylo:veylo /app/node_modules ./node_modules
+COPY --from=builder --chown=veylo:veylo /app/.next ./.next
+COPY --from=builder --chown=veylo:veylo /app/public ./public
+COPY --from=builder --chown=veylo:veylo /app/next.config.mjs ./next.config.mjs
 EXPOSE 3000
+USER veylo
 CMD ["pnpm", "start"]

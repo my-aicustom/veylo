@@ -41,9 +41,14 @@ function read(path) {
 }
 
 function lineValue(source, key) {
-  const escaped = key.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-  const match = source.match(new RegExp(`^\\s*${escaped}\\s*:\\s*([^#\\r\\n]+)`, 'mi'));
-  return match?.[1]?.trim() || '';
+  const normalized = key.toLowerCase();
+  for (const line of source.split(/\r?\n/)) {
+    const [candidate, ...rest] = line.split(':');
+    if (candidate?.trim().toLowerCase() === normalized) {
+      return rest.join(':').split('#')[0]?.trim() || '';
+    }
+  }
+  return '';
 }
 
 function isPlaceholder(value) {
@@ -111,7 +116,7 @@ function main() {
     record('nginx', 'Certificate configured', /ssl_certificate\s+[^;]+;/i.test(nginx), 'ssl_certificate');
     record('nginx', 'Private key configured', /ssl_certificate_key\s+[^;]+;/i.test(nginx), 'ssl_certificate_key');
     record('nginx', 'App proxy location', /location\s+\/app\b/i.test(nginx), 'location /app');
-    record('nginx', 'WebSocket upgrade forwarding', /proxy_set_header\s+Upgrade\s+\$http_upgrade/i.test(nginx), 'Upgrade header');
+    record('nginx', 'No arbitrary upgrade forwarding', !/proxy_set_header\s+Upgrade\s+\$http_upgrade/i.test(nginx), 'Upgrade header blocked');
     record('nginx', 'Forwarded HTTPS protocol', /proxy_set_header\s+X-Forwarded-Proto\s+https/i.test(nginx), 'X-Forwarded-Proto https');
     record('nginx', 'Real IP overwritten from socket peer', /proxy_set_header\s+X-Real-IP\s+\$remote_addr/i.test(nginx), 'X-Real-IP $remote_addr');
     for (const header of ['Content-Security-Policy', 'Strict-Transport-Security', 'X-Content-Type-Options', 'X-Frame-Options', 'Referrer-Policy', 'Permissions-Policy']) {

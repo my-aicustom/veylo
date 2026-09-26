@@ -46,6 +46,10 @@ async function json(response) {
   return { response, body };
 }
 
+function localFetch(url, options) {
+  return fetch(url, options);
+}
+
 async function stop(child) {
   if (!child || child.exitCode !== null) return;
   child.kill('SIGTERM');
@@ -80,14 +84,14 @@ try {
 
   await waitFor(`${appBase}/app/api/ready`, app);
 
-  const ready = await json(await fetch(`${appBase}/app/api/ready`));
+  const ready = await json(await localFetch(`${appBase}/app/api/ready`));
   assert(ready.response.status === 200 && ready.body.ready === true, 'App readiness endpoint is not ready.');
 
-  const health = await json(await fetch(`${appBase}/app/api/health`));
+  const health = await json(await localFetch(`${appBase}/app/api/health`));
   assert(health.response.status === 200 && health.body.app === 'Veylo', 'Health endpoint failed.');
   assert(health.body.config?.inviteProtection === true, 'Signed invite protection is not enabled in runtime smoke.');
 
-  const home = await fetch(`${appBase}/app`);
+  const home = await localFetch(`${appBase}/app`);
   assert(
     home.status === 200 && (home.headers.get('content-type') || '').includes('text/html'),
     'App homepage failed runtime smoke.',
@@ -98,11 +102,11 @@ try {
   assert(Boolean(home.headers.get('strict-transport-security')), 'Runtime HSTS header is missing.');
   assert(!home.headers.get('x-powered-by'), 'Runtime must not expose X-Powered-By.');
 
-  const diagnostics = await fetch(`${appBase}/app/diagnostics`);
+  const diagnostics = await localFetch(`${appBase}/app/diagnostics`);
   assert(diagnostics.status === 200, 'Diagnostics page failed runtime smoke.');
 
   const roomName = 'SMOKE123';
-  const invite = await json(await fetch(`${appBase}/app/api/invite`, {
+  const invite = await json(await localFetch(`${appBase}/app/api/invite`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ roomName }),
@@ -117,21 +121,21 @@ try {
     preferredLanguage: 'id',
   };
 
-  const denied = await fetch(`${appBase}/app/api/connection-details`, {
+  const denied = await localFetch(`${appBase}/app/api/connection-details`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(baseJoinBody),
   });
   assert(denied.status === 403, 'Room join without signed invite should be rejected.');
 
-  const tampered = await fetch(`${appBase}/app/api/connection-details`, {
+  const tampered = await localFetch(`${appBase}/app/api/connection-details`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ ...baseJoinBody, inviteToken: `${invite.body.token}x` }),
   });
   assert(tampered.status === 403, 'Tampered signed invite should be rejected.');
 
-  const allowed = await json(await fetch(`${appBase}/app/api/connection-details`, {
+  const allowed = await json(await localFetch(`${appBase}/app/api/connection-details`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ ...baseJoinBody, inviteToken: invite.body.token }),
