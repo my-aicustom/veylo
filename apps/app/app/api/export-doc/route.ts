@@ -1,11 +1,33 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { guardApi, cleanText } from '@/lib/api-guard';
 import type { TradeDocData } from '@/lib/pdf/trade-docs';
+import React from 'react';
+// @ts-expect-error - pdfkit 0.20.2 does not publish declarations for this entrypoint.
+import PDFDocument from 'pdfkit';
+
+if (typeof (PDFDocument as any)?.prototype?.initFonts === 'function') {
+  const proto = (PDFDocument as any).prototype;
+  proto.initFonts = function (_defaultFont?: string, _defaultFontFamily?: string | null, defaultFontSize = 12) {
+    this._fontFamilies = {};
+    this._fontCount = 0;
+    this._fontSource = null;
+    this._fontFamily = null;
+    this._fontSize = defaultFontSize;
+    this._font = null;
+    this._remSize = defaultFontSize;
+    this._registeredFonts = {};
+  };
+  const origFont = proto.font;
+  proto.font = function (src: any, family: any, size: any) {
+    if (typeof src === 'string' && src.startsWith('Helvetica')) {
+      return this;
+    }
+    return origFont ? origFont.call(this, src, family, size) : this;
+  };
+}
 
 export const runtime = 'nodejs';
 
-
-import React from 'react';
 
 const DOC_TYPES = ['invoice', 'packing-list', 'ska-form-d'] as const;
 type DocType = (typeof DOC_TYPES)[number];
@@ -142,4 +164,3 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'Failed to generate PDF document', details: err instanceof Error ? err.stack || err.message : String(err) }, { status: 500 });
   }
 }
-
