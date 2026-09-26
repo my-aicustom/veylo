@@ -1,3 +1,8 @@
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
+
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
+
 /** @type {import('next').NextConfig} */
 const basePath = process.env.NEXT_PUBLIC_BASE_PATH ?? '/app';
 const isProduction = process.env.NODE_ENV === 'production';
@@ -36,9 +41,7 @@ const nextConfig = {
   productionBrowserSourceMaps: false,
   basePath,
   serverExternalPackages: ['@react-pdf/renderer', 'pdfkit'],
-  outputFileTracingIncludes: {
-    '/api/export-doc': ['./node_modules/pdfkit/js/standard-fonts/**/*'],
-  },
+  outputFileTracingRoot: path.join(__dirname, '../../'),
   headers: async () => [{
     source: '/:path*',
     headers: securityHeaders,
