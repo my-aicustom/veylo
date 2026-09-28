@@ -1,5 +1,5 @@
 ---
-import { ClientRouter } from 'astro:transitions';
+import '../styles/global.css';
 
 interface Props {
   title?: string;
@@ -24,7 +24,6 @@ const {
     <meta name="twitter:card" content="summary_large_image" />
     <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
     <title>{title}</title>
-    <ClientRouter />
   </head>
   <body>
     <slot />
