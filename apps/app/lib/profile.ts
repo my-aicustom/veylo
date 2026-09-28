@@ -19,12 +19,12 @@ export function loadProfile(): Profile | null {
     const raw = localStorage.getItem(KEY);
     if (!raw) return null;
     const parsed = JSON.parse(raw) as Partial<Profile>;
-    if (!parsed.name || !parsed.countryCode) return null;
+    if (!parsed || typeof parsed.name !== 'string' || !parsed.name.trim() || typeof parsed.countryCode !== 'string' || !parsed.countryCode.trim()) return null;
     return {
       name: parsed.name,
       countryCode: parsed.countryCode,
-      countryName: parsed.countryName || countryName(parsed.countryCode),
-      preferredLanguage: parsed.preferredLanguage || defaultLanguage(parsed.countryCode),
+      countryName: typeof parsed.countryName === 'string' && parsed.countryName ? parsed.countryName : countryName(parsed.countryCode),
+      preferredLanguage: typeof parsed.preferredLanguage === 'string' && parsed.preferredLanguage ? parsed.preferredLanguage : defaultLanguage(parsed.countryCode),
     };
   } catch {
     return null;

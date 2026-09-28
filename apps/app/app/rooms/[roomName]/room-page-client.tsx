@@ -30,6 +30,7 @@ export function RoomPageClient({ roomName }: { roomName: string }) {
   const [choices, setChoices] = React.useState<LocalUserChoices | null>(null);
   const [connection, setConnection] = React.useState<ConnectionDetails | null>(null);
   const [error, setError] = React.useState('');
+  const joining = React.useRef(false);
 
   React.useEffect(() => {
     setProfile(loadProfile());
@@ -37,10 +38,11 @@ export function RoomPageClient({ roomName }: { roomName: string }) {
   }, []);
 
   const join = React.useCallback(async (values: LocalUserChoices) => {
-    if (!profile) return;
+    if (!profile || joining.current) return;
+    joining.current = true;
     setError('');
     setChoices(values);
-
+    try {
     const inviteToken = typeof window !== 'undefined'
       ? new URL(window.location.href).searchParams.get('invite')
       : null;
@@ -60,7 +62,7 @@ export function RoomPageClient({ roomName }: { roomName: string }) {
     const payload = await response.json();
     if (!response.ok) {
       setChoices(null);
-      if (payload?.code === 'LIVEKIT_NOT_CONFIGURED' || payload?.error?.toLowerCase().includes('livekit')) {
+      if (payload?.code === 'LIVEKIT_NOT_CONFIGURED') {
         setError('LIVEKIT_NOT_CONFIGURED');
       } else {
         setError(payload?.error || 'Could not join room');
@@ -68,6 +70,12 @@ export function RoomPageClient({ roomName }: { roomName: string }) {
       return;
     }
     setConnection(payload);
+    } catch {
+      setChoices(null);
+      setError('Could not reach the room server. Check your connection and try again.');
+    } finally {
+      joining.current = false;
+    }
   }, [profile, roomName]);
 
   if (!profileChecked) return <div className="center-screen">Loading…</div>;
@@ -104,7 +112,7 @@ export function RoomPageClient({ roomName }: { roomName: string }) {
               </p>
               <div className="livekit-notice-actions">
                 <button type="button" className="primary" onClick={() => router.push('/consultation')}>
-                  Buka Trade AI Advisor (Voice & Canvas) →
+                  Buka Trade AI Advisor (Voice &amp; Canvas) →
                 </button>
                 <a href="https://cloud.livekit.io" target="_blank" rel="noreferrer" className="ghost">
                   Daftar LiveKit Cloud Gratis (50GB) ↗

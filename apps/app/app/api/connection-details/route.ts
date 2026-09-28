@@ -26,7 +26,10 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const body = await request.json();
+    const body = await request.json().catch(() => null);
+    if (!body || typeof body !== 'object' || Array.isArray(body)) {
+      return NextResponse.json({ error: 'Invalid JSON object.' }, { status: 400 });
+    }
     const roomName = cleanText(body.roomName, 80);
     const participantName = cleanText(body.participantName, 80);
     if (!roomName || !participantName) {
@@ -85,6 +88,6 @@ export async function POST(request: NextRequest) {
     };
     return NextResponse.json(data, { headers: { 'Cache-Control': 'no-store' } });
   } catch (error) {
-    return NextResponse.json({ error: error instanceof Error ? error.message : 'Token creation failed' }, { status: 500 });
+    return NextResponse.json({ error: 'Token creation failed' }, { status: 500 });
   }
 }

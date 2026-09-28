@@ -7,7 +7,9 @@
   "packageManager": "pnpm@10.18.2",
   "pnpm": {
     "overrides": {
-      "pdfkit": "0.20.2"
+      "pdfkit": "0.20.2",
+      "postcss": "8.5.23",
+      "sharp": "0.35.4"
     }
   },
   "engines": {

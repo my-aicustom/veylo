@@ -86,14 +86,14 @@ function sanitizeData(raw: unknown): TradeDocData {
         return {
           description: cleanText(i.description, 200),
           hsCode: cleanText(i.hsCode, 20),
-          qty: typeof i.qty === 'number' ? Math.max(0, i.qty) : 0,
+          qty: finiteAmount(i.qty),
           unit: cleanText(i.unit, 30) || 'kg',
-          unitPrice: typeof i.unitPrice === 'number' ? Math.max(0, i.unitPrice) : 0,
+          unitPrice: finiteAmount(i.unitPrice),
           currency: cleanText(i.currency, 5) || 'USD',
-          grossWeightKg: typeof i.grossWeightKg === 'number' ? i.grossWeightKg : undefined,
-          netWeightKg: typeof i.netWeightKg === 'number' ? i.netWeightKg : undefined,
-          cbm: typeof i.cbm === 'number' ? i.cbm : undefined,
-          cartons: typeof i.cartons === 'number' ? i.cartons : undefined,
+          grossWeightKg: i.grossWeightKg === undefined ? undefined : finiteAmount(i.grossWeightKg),
+          netWeightKg: i.netWeightKg === undefined ? undefined : finiteAmount(i.netWeightKg),
+          cbm: i.cbm === undefined ? undefined : finiteAmount(i.cbm),
+          cartons: i.cartons === undefined ? undefined : finiteAmount(i.cartons),
         };
       })
     : [];
@@ -125,6 +125,10 @@ function sanitizeData(raw: unknown): TradeDocData {
   };
 }
 
+function finiteAmount(value: unknown): number {
+  return typeof value === 'number' && Number.isFinite(value) ? Math.min(1e12, Math.max(0, value)) : 0;
+}
+
 export async function POST(request: NextRequest) {
   const guard = guardApi(request, 'export-doc', { limit: 10, windowMs: 60_000 });
   if (guard) return guard;
@@ -136,6 +140,10 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'Invalid JSON body' }, { status: 400 });
   }
 
+  if (!body || typeof body !== 'object' || Array.isArray(body)) {
+    return NextResponse.json({ error: 'Invalid JSON object' }, { status: 400 });
+  }
+
   const type = cleanText(body.type, 20) as DocType;
   if (!DOC_TYPES.includes(type)) {
     return NextResponse.json(
@@ -145,6 +153,9 @@ export async function POST(request: NextRequest) {
   }
 
   const data = sanitizeData(body.data);
+  if (new Set(data.items.map((item) => item.currency.toUpperCase())).size > 1) {
+    return NextResponse.json({ error: 'All items must use the same currency.' }, { status: 400 });
+  }
 
   try {
     const pdfBuffer = await renderDoc(type, data);
@@ -161,6 +172,6 @@ export async function POST(request: NextRequest) {
     });
   } catch (err) {
     console.error('[export-doc] PDF render error:', err);
-    return NextResponse.json({ error: 'Failed to generate PDF document', details: err instanceof Error ? err.stack || err.message : String(err) }, { status: 500 });
+    return NextResponse.json({ error: 'Failed to generate PDF document' }, { status: 500 });
   }
 }

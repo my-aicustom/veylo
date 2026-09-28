@@ -1,6 +1,8 @@
+import { assetUrl } from '@/lib/paths';
+
 export function BrandMark({ href }: { href?: string }) {
   const content = <>
-    <span className="brand-symbol" aria-hidden="true"><img src="/app/veylo-mark.png" alt="" width="30" height="30" /></span>
+    <span className="brand-symbol" aria-hidden="true"><img src={assetUrl('/veylo-mark.png')} alt="" width="30" height="30" /></span>
     <span>VEYLO</span>
   </>;
 
@@ -18,7 +20,7 @@ export function BrandMark({ href }: { href?: string }) {
         target="_blank"
         rel="noreferrer"
       >
-        <img src="/app/my-aicustom-logo.webp" alt="" width="22" height="22" />
+        <img src={assetUrl('/my-aicustom-logo.webp')} alt="" width="22" height="22" />
         <span>Powered by my-aicustom</span>
       </a>
     </div>

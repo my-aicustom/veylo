@@ -119,6 +119,7 @@ export function VisualCanvas({ activeView, activeRoute, onViewChange }: VisualCa
         <div>
           <span className="eyebrow">VISUAL CANVAS</span>
           <h2>Trade Intelligence Board</h2>
+          <p>Data demonstrasi — tarif, harga, dan rute belum diverifikasi untuk transaksi.</p>
         </div>
         <div className="canvas-tabs" role="tablist" aria-label="Canvas views">
           {(['routes', 'tariff', 'compliance', 'market'] as VisualCanvasView[]).map((item) => (
@@ -191,8 +192,9 @@ function RouteVisualizer({ routeId, onRouteChange }: { routeId: string; onRouteC
 
       <div className="route-stats">
         <div><span>Transit</span><strong>{mode === 'sea' ? selected.transitSea : selected.transitAir}</strong></div>
-        <div><span>20ft est.</span><strong>USD {selected.rate20.toLocaleString('en-US')}</strong></div>
-        <div><span>40ft est.</span><strong>USD {selected.rate40.toLocaleString('en-US')}</strong></div>
+        {mode === 'sea' && <div><span>20ft est.</span><strong>USD {selected.rate20.toLocaleString('en-US')}</strong></div>}
+        {mode === 'sea' && <div><span>40ft est.</span><strong>USD {selected.rate40.toLocaleString('en-US')}</strong></div>}
+        {mode === 'air' && <div><span>Air freight</span><strong>Quotation required</strong></div>}
       </div>
       <div className="milestone-strip">
         {selected.milestones.map((milestone) => <span key={milestone}>{milestone}</span>)}
@@ -241,15 +243,18 @@ function TariffCard() {
 }
 
 function ComplianceRadar() {
+  const [checked, setChecked] = React.useState<boolean[]>(() => checklist.map(() => false));
+  const readiness = Math.round(checked.filter(Boolean).length / checklist.length * 100);
   return (
     <div className="compliance-radar">
-      <div className="readiness-gauge" aria-label="92% Export Ready">
-        <div><strong>92%</strong><span>Export Ready</span></div>
+      <p>Checklist mandiri; bukan sertifikasi Export Ready.</p>
+      <div className="readiness-gauge" aria-label={`${readiness}% checklist completed`}>
+        <div><strong>{readiness}%</strong><span>Checklist completed</span></div>
       </div>
       <div className="compliance-list">
         {checklist.map((item, index) => (
           <label key={item}>
-            <input type="checkbox" defaultChecked={index < 4} />
+            <input type="checkbox" checked={checked[index]} onChange={(event) => setChecked((current) => current.map((value, i) => i === index ? event.target.checked : value))} />
             <span>{item}</span>
           </label>
         ))}

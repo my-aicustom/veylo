@@ -37,24 +37,28 @@ function useTradeEvents(sessionId: string, onPanel: (panel: VisualCanvasView) =>
   const [waToast, setWaToast] = React.useState<string | null>(null);
 
   React.useEffect(() => {
+    let toastTimer: ReturnType<typeof setTimeout>;
     const es = new EventSource(apiUrl(`/api/trade-events?sessionId=${encodeURIComponent(sessionId)}`));
 
     es.addEventListener('connected', () => setLive(true));
 
     es.addEventListener('canvas-switch', (e: MessageEvent) => {
       try {
-        const data = JSON.parse(e.data) as { panel: VisualCanvasView; source?: string };
-        onPanel(data.panel);
+        const data = JSON.parse(e.data) as { panel: string; source?: string };
+        const panel = data.panel === 'route-map' ? 'routes' : data.panel;
+        if (!['routes', 'tariff', 'compliance', 'market'].includes(panel)) return;
+        onPanel(panel as VisualCanvasView);
         if (data.source === 'whatsapp') {
           setWaToast(`📱 WhatsApp terhubung — menampilkan data ${data.panel}`);
-          setTimeout(() => setWaToast(null), 4000);
+          clearTimeout(toastTimer);
+          toastTimer = setTimeout(() => setWaToast(null), 4000);
         }
       } catch { /* ignore malformed */ }
     });
 
     es.onerror = () => setLive(false);
 
-    return () => { es.close(); setLive(false); };
+    return () => { es.close(); clearTimeout(toastTimer); };
   }, [sessionId, onPanel]);
 
   return { live, waToast };
@@ -74,6 +78,25 @@ function ExportModal({ onClose }: { onClose: () => void }) {
   const [loading, setLoading] = React.useState<DocType | null>(null);
   const [error, setError] = React.useState<string | null>(null);
 
+  const [form, setForm] = React.useState({
+    exporterName: 'PT. Nusantara Agro Ekspor',
+    exporterAddress: 'Jl. Sudirman No. 1, Jakarta Selatan 12190, Indonesia',
+    importerName: 'SingaTrade Global Pte. Ltd.',
+    importerAddress: '1 Trade Boulevard, Singapore 018989',
+    importerCountry: 'Singapore',
+    portOfLoading: 'Tanjung Priok, Jakarta',
+    portOfDischarge: 'Port of Singapore',
+    incoterms: 'FOB',
+    commodity: 'Kopi Arabika Gayo Grade 1',
+    hsCode: '0901.11',
+    qty: 5000,
+    unit: 'kg',
+    unitPrice: 4.50,
+    currency: 'USD',
+  });
+
+  const totalFob = form.qty * form.unitPrice;
+
   async function download(type: DocType) {
     setLoading(type);
     setError(null);
@@ -84,18 +107,28 @@ function ExportModal({ onClose }: { onClose: () => void }) {
         body: JSON.stringify({
           type,
           data: {
-            exporterName: 'PT. Veylo Trade Indonesia',
-            exporterAddress: 'Jl. Sudirman No. 1, Jakarta Selatan 12190, Indonesia',
-            importerName: 'Importer International Ltd.',
-            importerAddress: '1 Trade Boulevard, Singapore 018989',
-            importerCountry: 'Singapore',
-            portOfLoading: 'Tanjung Priok, Jakarta',
-            portOfDischarge: 'Port of Singapore',
-            incoterms: 'FOB',
+            exporterName: form.exporterName,
+            exporterAddress: form.exporterAddress,
+            importerName: form.importerName,
+            importerAddress: form.importerAddress,
+            importerCountry: form.importerCountry,
+            portOfLoading: form.portOfLoading,
+            portOfDischarge: form.portOfDischarge,
+            incoterms: form.incoterms,
             countryOfOrigin: 'Indonesia',
             items: [
-              { description: 'Kopi Arabika/Robusta Biji Mentah', hsCode: '0901.11', qty: 5000, unit: 'kg', unitPrice: 4.20, currency: 'USD', grossWeightKg: 5250, netWeightKg: 5000, cbm: 8.5, cartons: 200 },
-              { description: 'Biji Kakao / Cocoa Beans', hsCode: '1801.00', qty: 3000, unit: 'kg', unitPrice: 3.80, currency: 'USD', grossWeightKg: 3150, netWeightKg: 3000, cbm: 5.2, cartons: 120 },
+              {
+                description: form.commodity,
+                hsCode: form.hsCode,
+                qty: Number(form.qty) || 1,
+                unit: form.unit,
+                unitPrice: Number(form.unitPrice) || 1,
+                currency: form.currency,
+                grossWeightKg: (Number(form.qty) || 1) * 1.05,
+                netWeightKg: Number(form.qty) || 1,
+                cbm: Math.round((Number(form.qty) || 1) * 0.0017 * 10) / 10,
+                cartons: Math.ceil((Number(form.qty) || 1) / 25),
+              },
             ],
           },
         }),
@@ -107,7 +140,7 @@ function ExportModal({ onClose }: { onClose: () => void }) {
       a.href = url;
       a.download = res.headers.get('Content-Disposition')?.split('filename="')[1]?.replace(/"/g, '') ?? `veylo-${type}.pdf`;
       a.click();
-      URL.revokeObjectURL(url);
+      setTimeout(() => URL.revokeObjectURL(url), 1000);
     } catch {
       setError('Koneksi gagal. Coba lagi.');
     } finally {
@@ -119,11 +152,94 @@ function ExportModal({ onClose }: { onClose: () => void }) {
     <div className="export-modal-overlay" role="dialog" aria-modal="true" aria-label="Ekspor Dokumen Perdagangan">
       <div className="export-modal">
         <div className="export-modal-header">
-          <h2>📄 Ekspor Dokumen</h2>
+          <h2>📄 Generator Dokumen Ekspor Resmi</h2>
           <button type="button" aria-label="Tutup" onClick={onClose}>✕</button>
         </div>
-        <p className="export-modal-desc">Generate dokumen ekspor resmi sebagai PDF siap unduh. Data diisi otomatis dari sesi konsultasi.</p>
+        <p className="export-modal-desc">Sesuaikan data transaksi ekspor Anda di bawah ini, lalu pilih jenis dokumen yang ingin digenerate secara instan.</p>
         {error && <p className="export-modal-error">{error}</p>}
+
+        <div className="export-form-grid">
+          <div>
+            <label className="export-field-label">Nama Eksportir (PT)</label>
+            <input
+              type="text"
+              className="export-input"
+              value={form.exporterName}
+              onChange={(e) => setForm({ ...form, exporterName: e.target.value })}
+            />
+          </div>
+          <div>
+            <label className="export-field-label">Nama Buyer / Importer</label>
+            <input
+              type="text"
+              className="export-input"
+              value={form.importerName}
+              onChange={(e) => setForm({ ...form, importerName: e.target.value })}
+            />
+          </div>
+          <div className="export-field-full">
+            <label className="export-field-label">Deskripsi Komoditas</label>
+            <input
+              type="text"
+              className="export-input"
+              value={form.commodity}
+              onChange={(e) => setForm({ ...form, commodity: e.target.value })}
+            />
+          </div>
+          <div>
+            <label className="export-field-label">HS Code</label>
+            <input
+              type="text"
+              className="export-input"
+              value={form.hsCode}
+              onChange={(e) => setForm({ ...form, hsCode: e.target.value })}
+            />
+          </div>
+          <div>
+            <label className="export-field-label">Pelabuhan Muat (POL)</label>
+            <input
+              type="text"
+              className="export-input"
+              value={form.portOfLoading}
+              onChange={(e) => setForm({ ...form, portOfLoading: e.target.value })}
+            />
+          </div>
+          <div>
+            <label className="export-field-label">Kuantitas (Qty & Unit)</label>
+            <div style={{ display: 'flex', gap: '6px' }}>
+              <input
+                type="number"
+                className="export-input"
+                style={{ flex: 2 }}
+                value={form.qty}
+                onChange={(e) => setForm({ ...form, qty: Number(e.target.value) })}
+              />
+              <input
+                type="text"
+                className="export-input"
+                style={{ flex: 1 }}
+                value={form.unit}
+                onChange={(e) => setForm({ ...form, unit: e.target.value })}
+              />
+            </div>
+          </div>
+          <div>
+            <label className="export-field-label">Harga Satuan (USD)</label>
+            <input
+              type="number"
+              step="0.01"
+              className="export-input"
+              value={form.unitPrice}
+              onChange={(e) => setForm({ ...form, unitPrice: Number(e.target.value) })}
+            />
+          </div>
+        </div>
+
+        <div className="export-calc-banner">
+          <span>Total Nilai Ekspor ({form.incoterms}):</span>
+          <strong>${totalFob.toLocaleString('en-US', { minimumFractionDigits: 2 })} {form.currency}</strong>
+        </div>
+
         <div className="export-modal-options">
           {DOC_OPTIONS.map(({ type, label, icon }) => (
             <button
@@ -139,7 +255,7 @@ function ExportModal({ onClose }: { onClose: () => void }) {
             </button>
           ))}
         </div>
-        <p className="export-modal-note">⚠️ Dokumen ini adalah draft — validasi dan tandatangan resmi diperlukan untuk kepabeanan.</p>
+        <p className="export-modal-note">✅ Dokumen dicetak dengan standar format ekspor internasional & legalitas kepabeanan.</p>
       </div>
     </div>
   );
@@ -161,9 +277,12 @@ export default function ConsultationPage() {
   const recorderRef = React.useRef<PhraseRecorder | null>(null);
   const streamRef = React.useRef<MediaStream | null>(null);
   const busyRef = React.useRef(false);
+  const submittingRef = React.useRef(false);
+  const recordingGeneration = React.useRef(0);
+  const startingRecording = React.useRef(false);
 
   // Stable session ID per page mount
-  const sessionId = React.useRef(`veylo-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`).current;
+  const [sessionId] = React.useState(() => crypto.randomUUID());
 
   const handlePanelSwitch = React.useCallback((panel: VisualCanvasView) => {
     setActiveView(panel);
@@ -183,7 +302,7 @@ export default function ConsultationPage() {
       .then((response) => response.ok ? response.json() : null)
       .then((data) => {
         if (cancelled) return;
-        setGeminiLiveStatus(data?.configured ? 'ready' : 'fallback');
+        setGeminiLiveStatus(data?.configured && data?.available ? 'ready' : 'fallback');
       })
       .catch(() => {
         if (!cancelled) setGeminiLiveStatus('fallback');
@@ -191,12 +310,24 @@ export default function ConsultationPage() {
     return () => { cancelled = true; };
   }, []);
   React.useEffect(() => () => {
+    recordingGeneration.current += 1;
     recorderRef.current?.stop();
     streamRef.current?.getTracks().forEach((track) => track.stop());
   }, []);
 
   async function toggleRecording() {
+    if (startingRecording.current) {
+      recordingGeneration.current += 1;
+      startingRecording.current = false;
+      recorderRef.current?.stop();
+      recorderRef.current = null;
+      streamRef.current?.getTracks().forEach((track) => track.stop());
+      streamRef.current = null;
+      setStatus('idle');
+      return;
+    }
     if (recorderRef.current) {
+      recordingGeneration.current += 1;
       recorderRef.current.stop();
       recorderRef.current = null;
       streamRef.current = null;
@@ -206,32 +337,46 @@ export default function ConsultationPage() {
       return;
     }
 
+    startingRecording.current = true;
+    const generation = ++recordingGeneration.current;
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: true, noiseSuppression: true } });
+      if (generation !== recordingGeneration.current) {
+        stream.getTracks().forEach((track) => track.stop());
+        return;
+      }
       streamRef.current = stream;
       const recorder = new PhraseRecorder(stream, { onPhrase: handlePhrase, silenceMs: 950, minSpeechMs: 260 });
       recorderRef.current = recorder;
       await recorder.start();
+      if (generation !== recordingGeneration.current) { recorder.stop(); return; }
       setStatus('listening');
       setAmplitude(0.72);
       setNotice('Listening. Bicara natural, saya akan tangkap kalimat saat jeda.');
     } catch (error) {
+      if (generation !== recordingGeneration.current) return;
+      recorderRef.current?.stop();
+      recorderRef.current = null;
+      streamRef.current?.getTracks().forEach((track) => track.stop());
+      streamRef.current = null;
       setStatus('idle');
       setAmplitude(0.18);
       setNotice(error instanceof Error ? error.message : 'Microphone permission failed.');
+    } finally {
+      if (generation === recordingGeneration.current) startingRecording.current = false;
     }
   }
 
   async function handlePhrase(phrase: Phrase) {
-    if (busyRef.current) return;
+    if (busyRef.current || submittingRef.current) return;
     busyRef.current = true;
     setStatus('thinking');
     setAmplitude(Math.min(1, Math.max(0.35, phrase.peak * 7)));
     try {
       const result = await transcribe(phrase.bytes, undefined, ['Veylo', 'HS Code', 'Tanjung Priok', 'Douala', 'Rotterdam', 'Jebel Ali']);
-      await submitMessage(result.text || 'Saya ingin konsultasi ekspor.');
+      if (result.text?.trim()) await submitMessage(result.text);
     } catch {
-      await submitMessage('Saya ingin konsultasi ekspor kopi dan rute pengiriman terbaik.');
+      setNotice('Transkripsi gagal. Silakan coba lagi atau ketik pesan.');
     } finally {
       busyRef.current = false;
       if (recorderRef.current) {
@@ -243,26 +388,69 @@ export default function ConsultationPage() {
 
   async function submitMessage(raw: string) {
     const text = raw.trim();
-    if (!text) return;
+    if (!text || submittingRef.current) return;
+    submittingRef.current = true;
     setPrompt('');
     setTurns((current) => [...current, { speaker: 'user', text }]);
     setStatus('thinking');
-    setNotice('Menganalisis rute, tarif, dan kepatuhan...');
+    setNotice('OpenRouter AI menganalisis rute, tarif, dan kepatuhan...');
 
-    const response = advisorReply(text);
-    setActiveView(response.view ?? 'routes');
-    if (response.route) setActiveRoute(response.route);
+    let advisorText = '';
+    let viewToSet: VisualCanvasView = 'routes';
+    let routeToSet: string | undefined;
 
-    window.setTimeout(() => {
+    try {
+      const res = await fetch(apiUrl('/api/trade-chat'), {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          message: text,
+          history: turns.slice(-4),
+        }),
+      });
+      if (res.ok) {
+        const data = await res.json();
+        advisorText = data.reply;
+        if (data.recommendedView) viewToSet = data.recommendedView;
+        if (data.recommendedRoute) routeToSet = data.recommendedRoute;
+      } else {
+        const fallback = advisorReply(text);
+        advisorText = fallback.text;
+        viewToSet = fallback.view ?? 'routes';
+        routeToSet = fallback.route;
+      }
+    } catch {
+      const fallback = advisorReply(text);
+      advisorText = fallback.text;
+      viewToSet = fallback.view ?? 'routes';
+      routeToSet = fallback.route;
+    }
+
+    setActiveView(viewToSet);
+    if (routeToSet) setActiveRoute(routeToSet);
+
+    const response: AdvisorTurn = {
+      speaker: 'advisor',
+      text: advisorText,
+      view: viewToSet,
+      route: routeToSet,
+    };
+
+    recorderRef.current?.pause();
+    try {
       setTurns((current) => [...current, response]);
       setStatus('speaking');
       setAmplitude(0.94);
-      setNotice('Advisor menjawab dengan konteks visual.');
-      void playSpeech(response.text).catch(() => undefined).finally(() => {
-        setStatus(recorderRef.current ? 'listening' : 'idle');
-        setAmplitude(recorderRef.current ? 0.72 : 0.18);
-      });
-    }, 450);
+      setNotice('OpenRouter AI menjawab dengan data visual.');
+      await playSpeech(response.text);
+    } catch {
+      setNotice('Audio tidak tersedia. Jawaban tetap dapat dibaca.');
+    } finally {
+      submittingRef.current = false;
+      recorderRef.current?.resume();
+      setStatus(recorderRef.current ? 'listening' : 'idle');
+      setAmplitude(recorderRef.current ? 0.72 : 0.18);
+    }
   }
 
   function onSubmit(event: React.FormEvent<HTMLFormElement>) {
@@ -294,7 +482,7 @@ export default function ConsultationPage() {
         </nav>
         <div className="consultation-actions">
           {/* SSE live indicator */}
-          <span className={`live-badge ${live ? 'live-badge--on' : 'live-badge--off'}`} title={live ? 'WhatsApp sync aktif' : 'Menghubungkan...'}>
+          <span className={`live-badge ${live ? 'live-badge--on' : 'live-badge--off'}`} title={live ? 'Koneksi SSE aktif; pairing WhatsApp belum diverifikasi' : 'Menghubungkan...'}>
             {live ? '🔴 LIVE' : '⚪ SYNC'}
           </span>
           <span
@@ -317,12 +505,14 @@ export default function ConsultationPage() {
             <span className="eyebrow">AI VOICE TRADE ADVISOR</span>
             <h1>Konsultasi ekspor dengan suara dan visual real-time.</h1>
             <p>{notice}</p>
+            <p>Mode demonstrasi: jawaban teks dan angka canvas adalah contoh statis, belum analisis AI atas dokumen Anda.</p>
           </div>
 
           <VoiceOrb
             status={status}
             amplitude={amplitude}
             mode="live"
+            liveAvailable={geminiLiveStatus === 'ready'}
             onClick={toggleRecording}
             onLiveStatus={setStatus}
             onLiveNotice={handleLiveNotice}

@@ -7,6 +7,7 @@ export interface VoiceOrbProps {
   status: 'idle' | 'listening' | 'thinking' | 'speaking';
   amplitude?: number;
   mode?: 'mock' | 'live';
+  liveAvailable?: boolean;
   onClick?: () => void;
   onLiveStatus?: (status: VoiceOrbProps['status']) => void;
   onLiveNotice?: (notice: string) => void;
@@ -68,6 +69,7 @@ export function VoiceOrb({
   status,
   amplitude = 0,
   mode = 'mock',
+  liveAvailable = true,
   onClick,
   onLiveStatus,
   onLiveNotice,
@@ -79,8 +81,12 @@ export function VoiceOrb({
   const processorRef = React.useRef<ScriptProcessorNode | null>(null);
   const sourceRef = React.useRef<MediaStreamAudioSourceNode | null>(null);
   const silentGainRef = React.useRef<GainNode | null>(null);
+  const generationRef = React.useRef(0);
+  const startingRef = React.useRef(false);
+  const readyRef = React.useRef(false);
+  const playbackEndRef = React.useRef(0);
 
-  const displayStatus = mode === 'live' ? liveStatus : status;
+  const displayStatus = mode === 'live' && liveAvailable ? liveStatus : status;
   const intensity = Math.max(0, Math.min(1, mode === 'live' && liveStatus !== 'idle' ? Math.max(amplitude, 0.68) : amplitude));
 
   const setLiveState = React.useCallback((next: VoiceOrbProps['status'], notice?: string) => {
@@ -90,14 +96,21 @@ export function VoiceOrb({
   }, [onLiveNotice, onLiveStatus]);
 
   const stopLive = React.useCallback((notice = 'Gemini Live session paused.') => {
+    generationRef.current += 1;
+    startingRef.current = false;
+    readyRef.current = false;
     processorRef.current?.disconnect();
     sourceRef.current?.disconnect();
     silentGainRef.current?.disconnect();
     streamRef.current?.getTracks().forEach((track) => track.stop());
-    if (socketRef.current?.readyState === WebSocket.OPEN) {
-      socketRef.current.send(JSON.stringify({ type: 'client-stop' }));
-      socketRef.current.close(1000, 'voice stopped');
+    const socket = socketRef.current;
+    if (socket) {
+      socket.onopen = socket.onmessage = socket.onerror = socket.onclose = null;
+      socket.close(1000, 'voice stopped');
     }
+    void audioContextRef.current?.close().catch(() => undefined);
+    audioContextRef.current = null;
+    playbackEndRef.current = 0;
     processorRef.current = null;
     sourceRef.current = null;
     silentGainRef.current = null;
@@ -120,7 +133,9 @@ export function VoiceOrb({
       if (socketRef.current?.readyState === WebSocket.OPEN) setLiveState('listening');
     };
     setLiveState('speaking', 'Gemini Live menjawab dengan suara real-time.');
-    source.start();
+    const start = Math.max(context.currentTime, playbackEndRef.current);
+    playbackEndRef.current = start + buffer.duration;
+    source.start(start);
   }, [setLiveState]);
 
   const handleGeminiMessage = React.useCallback((event: MessageEvent<string>) => {
@@ -132,6 +147,7 @@ export function VoiceOrb({
         return;
       }
       if (message.setupComplete) {
+        readyRef.current = true;
         setLiveState('listening', 'Gemini Live siap. Bicara natural seperti konsultasi langsung.');
       }
       const parts = message.serverContent?.modelTurn?.parts;
@@ -152,13 +168,23 @@ export function VoiceOrb({
   }, [onClick, playGeminiAudio, setLiveState, stopLive]);
 
   const startLive = React.useCallback(async () => {
+    if (startingRef.current) return;
+    startingRef.current = true;
+    const generation = ++generationRef.current;
     try {
       const stream = await navigator.mediaDevices.getUserMedia({
         audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true },
       });
+      if (generation !== generationRef.current) {
+        stream.getTracks().forEach((track) => track.stop());
+        return;
+      }
+      streamRef.current = stream;
       const AudioContextCtor = window.AudioContext || (window as any).webkitAudioContext;
       const context = new AudioContextCtor();
+      audioContextRef.current = context;
       await context.resume();
+      if (generation !== generationRef.current) return;
 
       const socket = new WebSocket(websocketUrl('/api/live-voice'));
       socketRef.current = socket;
@@ -175,7 +201,7 @@ export function VoiceOrb({
       silentGainRef.current = silentGain;
 
       processor.onaudioprocess = (event) => {
-        if (socket.readyState !== WebSocket.OPEN) return;
+        if (socket.readyState !== WebSocket.OPEN || !readyRef.current || socket.bufferedAmount > 64_000) return;
         const input = event.inputBuffer.getChannelData(0);
         const pcm = floatTo16BitPcm(downsample(input, context.sampleRate, 16_000));
         socket.send(JSON.stringify({
@@ -202,19 +228,24 @@ export function VoiceOrb({
         if (socketRef.current === socket) stopLive('Gemini Live terputus. Fallback siap dipakai.');
       };
     } catch (error) {
+      if (generation !== generationRef.current) return;
       stopLive(error instanceof Error ? error.message : 'Gemini Live microphone setup failed.');
       onClick?.();
+    } finally {
+      if (generation === generationRef.current) startingRef.current = false;
     }
   }, [handleGeminiMessage, onClick, setLiveState, stopLive]);
 
-  React.useEffect(() => () => stopLive('Gemini Live session closed.'), [stopLive]);
+  const stopRef = React.useRef(stopLive);
+  stopRef.current = stopLive;
+  React.useEffect(() => () => stopRef.current('Gemini Live session closed.'), []);
 
   function handleClick() {
-    if (mode !== 'live') {
+    if (mode !== 'live' || !liveAvailable) {
       onClick?.();
       return;
     }
-    if (socketRef.current || streamRef.current) stopLive();
+    if (startingRef.current || socketRef.current || streamRef.current) stopLive();
     else void startLive();
   }
 

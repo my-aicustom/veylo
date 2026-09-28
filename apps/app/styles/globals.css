@@ -468,19 +468,26 @@ h1 { margin: 0; font-size: clamp(42px, 7vw, 92px); line-height: .95; letter-spac
 
 /* ─── Export Modal ──────────────────────────────────────────────────────── */
 .export-modal-overlay { position:fixed; inset:0; z-index:100; background:rgba(0,0,0,.65); backdrop-filter:blur(6px); display:flex; align-items:center; justify-content:center; padding:20px; }
-.export-modal { background:var(--panel); border:1px solid var(--line); border-radius:20px; padding:28px; max-width:440px; width:100%; box-shadow:0 20px 60px rgba(0,0,0,.5); }
+.export-modal { background:var(--panel); border:1px solid var(--line); border-radius:20px; padding:24px; max-width:540px; width:100%; max-height:90vh; overflow-y:auto; box-shadow:0 20px 60px rgba(0,0,0,.5); }
 .export-modal-header { display:flex; align-items:center; justify-content:space-between; margin-bottom:10px; }
 .export-modal-header h2 { font-size:18px; margin:0; }
-.export-modal-header button { background:none; border:none; color:var(--muted); font-size:18px; padding:4px 8px; border-radius:8px; line-height:1; }
+.export-modal-header button { background:none; border:none; color:var(--muted); font-size:18px; padding:4px 8px; border-radius:8px; line-height:1; cursor:pointer; }
 .export-modal-header button:hover { color:var(--text); background:var(--panel-2); }
 .export-modal-desc { font-size:13px; color:var(--muted); margin:0 0 16px; }
 .export-modal-error { font-size:13px; color:var(--danger); margin:0 0 12px; background:rgba(246,109,109,.1); padding:8px 12px; border-radius:8px; }
+.export-form-grid { display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-bottom:14px; text-align:left; }
+.export-field-full { grid-column:span 2; }
+.export-field-label { display:block; font-size:11px; font-weight:600; color:var(--muted); margin-bottom:4px; text-transform:uppercase; letter-spacing:.04em; }
+.export-input { width:100%; box-sizing:border-box; background:var(--panel-2); border:1px solid var(--line); border-radius:8px; padding:8px 12px; font-size:13px; color:var(--text); outline:none; transition:border-color .15s; }
+.export-input:focus { border-color:var(--accent); }
+.export-calc-banner { background:rgba(217,255,99,0.06); border:1px solid rgba(217,255,99,0.2); border-radius:10px; padding:10px 14px; margin-bottom:16px; display:flex; justify-content:space-between; align-items:center; font-size:12px; }
+.export-calc-banner strong { font-size:15px; color:var(--accent); }
 .export-modal-options { display:flex; flex-direction:column; gap:10px; margin-bottom:16px; }
-.export-doc-btn { display:flex; align-items:center; gap:12px; background:var(--panel-2); border:1px solid var(--line); color:var(--text); padding:14px 16px; border-radius:12px; text-align:left; font-size:14px; font-weight:500; transition:background .15s,border-color .15s; }
+.export-doc-btn { display:flex; align-items:center; gap:12px; background:var(--panel-2); border:1px solid var(--line); color:var(--text); padding:12px 16px; border-radius:12px; text-align:left; font-size:13px; font-weight:600; cursor:pointer; transition:background .15s,border-color .15s; }
 .export-doc-btn:hover:not(:disabled) { background:var(--line); border-color:var(--accent); }
-.export-doc-icon { font-size:20px; flex-shrink:0; }
+.export-doc-icon { font-size:18px; flex-shrink:0; }
 .export-loading { margin-left:auto; font-size:11px; color:var(--muted); }
-.export-modal-note { font-size:11px; color:var(--soft); margin:0; line-height:1.5; }
+.export-modal-note { font-size:11px; color:var(--soft); margin:0; line-height:1.5; text-align:center; }
 
 /* ─── SSE Live Badge ────────────────────────────────────────────────────── */
 .live-badge { font-size:11px; font-weight:700; padding:4px 10px; border-radius:999px; letter-spacing:.05em; }

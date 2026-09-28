@@ -35,6 +35,10 @@
       "parameters": {
         "method": "POST",
         "url": "https://veylo-swart.vercel.app/app/api/trade-events",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [{ "name": "Authorization", "value": "={{ 'Bearer ' + $env.VEYLO_TRADE_WEBHOOK_SECRET }}" }]
+        },
         "sendBody": true,
         "contentType": "json",
         "bodyParameters": {

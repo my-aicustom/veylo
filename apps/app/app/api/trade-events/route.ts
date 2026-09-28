@@ -6,6 +6,7 @@
  */
 import { NextRequest, NextResponse } from 'next/server';
 import { guardApi, cleanText } from '@/lib/api-guard';
+import { timingSafeEqual } from 'node:crypto';
 
 export const runtime = 'nodejs';
 
@@ -40,6 +41,8 @@ function keepalive(ctrl: ReadableStreamDefaultController<Uint8Array>) {
 // ─── GET — SSE subscribe ──────────────────────────────────────────────────────
 
 export async function GET(request: NextRequest) {
+  const blocked = guardApi(request, 'trade-events-subscribe', { limit: 120 });
+  if (blocked) return blocked;
   const sessionId = cleanText(request.nextUrl.searchParams.get('sessionId') ?? '', 64);
   if (!sessionId) {
     return NextResponse.json({ error: 'sessionId required' }, { status: 400 });
@@ -50,6 +53,10 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: 'Server busy' }, { status: 503 });
   }
 
+  if (sessions.has(sessionId)) {
+    return NextResponse.json({ error: 'Session already connected' }, { status: 409 });
+  }
+  let cleanup = () => {};
   const stream = new ReadableStream<Uint8Array>({
     start(ctrl) {
       sessions.set(sessionId, ctrl);
@@ -62,17 +69,21 @@ export async function GET(request: NextRequest) {
         try {
           keepalive(ctrl);
         } catch {
-          clearInterval(interval);
+          cleanup();
         }
       }, 25_000);
 
       // Cleanup on close
-      request.signal.addEventListener('abort', () => {
+      cleanup = () => {
         clearInterval(interval);
-        sessions.delete(sessionId);
+        if (sessions.get(sessionId) === ctrl) sessions.delete(sessionId);
+        request.signal.removeEventListener('abort', cleanup);
         try { ctrl.close(); } catch { /* already closed */ }
-      });
+      };
+      request.signal.addEventListener('abort', cleanup, { once: true });
+      if (request.signal.aborted) cleanup();
     },
+    cancel() { cleanup(); },
   });
 
   return new NextResponse(stream, {
@@ -94,11 +105,24 @@ export async function POST(request: NextRequest) {
   const guard = guardApi(request, 'trade-events-push', { limit: 120, windowMs: 60_000 });
   if (guard) return guard;
 
+  // Origin is not authentication: server-to-server callers can omit it.
+  const secret = process.env.VEYLO_TRADE_WEBHOOK_SECRET;
+  if (!secret) return NextResponse.json({ error: 'Trade webhook is not configured' }, { status: 503 });
+  const expected = Buffer.from(`Bearer ${secret}`);
+  const actual = Buffer.from(request.headers.get('authorization') ?? '');
+  if (actual.length !== expected.length || !timingSafeEqual(actual, expected)) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  }
+
   let body: Record<string, unknown>;
   try {
     body = await request.json();
   } catch {
     return NextResponse.json({ error: 'Invalid JSON' }, { status: 400 });
+  }
+
+  if (!body || typeof body !== 'object' || Array.isArray(body)) {
+    return NextResponse.json({ error: 'Invalid JSON object' }, { status: 400 });
   }
 
   const sessionId = cleanText(body.sessionId as string, 64);

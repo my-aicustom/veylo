@@ -22,21 +22,21 @@ function DualEntryCards({ onVoice }: { onVoice: () => void }) {
         <div className="entry-copy">
           <span className="entry-kicker">AI Voice Trade Assistant (Jarvis Mode)</span>
           <h2>Konsultasi Suara Interaktif</h2>
-          <p>Bicara langsung dengan AI ekspor bersuara native. Dilengkapi Voice Orb 60fps & Visual Canvas (Peta Rute Kargo Laut/Udara, Kalkulator Tarif HS Code, & Radar Kepatuhan).</p>
+          <p>Jelajahi konsultasi suara dan Visual Canvas: peta rute kargo, kalkulator contoh tarif, dan checklist kepatuhan. Advisor saat ini menggunakan skenario demonstrasi.</p>
         </div>
         <div className="entry-visual" aria-hidden="true">
           <VoiceOrb status="speaking" amplitude={0.82} />
         </div>
         <div className="entry-action-row">
           <button className="primary" type="button" onClick={onVoice}>Mulai Konsultasi Suara</button>
-          <span>Multimodal Gemini 2.5 · Instant Voice</span>
+          <span>Voice recording · Demo advisor</span>
         </div>
       </article>
       <article className="dual-entry-card whatsapp-entry">
         <div className="entry-copy">
           <span className="entry-kicker">Fast WhatsApp Desk (+62 896-6015-2525)</span>
           <h2>Chat WhatsApp Resmi</h2>
-          <p>Lebih suka chatan teks cepat tanpa bicara? Langsung terhubung ke AI Trade Intelligence & Konsultan Ekspor kami di WhatsApp resmi.</p>
+          <p>Lebih suka chat teks? Buka kontak konsultasi ekspor kami di WhatsApp.</p>
         </div>
         <div className="whatsapp-visual" aria-hidden="true">
           <span>+62</span>
@@ -138,8 +138,8 @@ export default function HomePage() {
       {/* Live Visual Canvas Showcase */}
       <section className="home-canvas-showcase" aria-label="Trade Intelligence Board">
         <div className="section-header">
-          <div className="eyebrow">LIVE TRADE RADAR & SIMULATOR</div>
-          <h2>Peta Rute Kargo, Tarif HS Code, & Radar Kepatuhan</h2>
+          <div className="eyebrow">TRADE RADAR &amp; SIMULATOR DEMO</div>
+          <h2>Peta Rute Kargo, Tarif HS Code, dan Radar Kepatuhan</h2>
           <p className="lede" style={{ marginTop: '8px', fontSize: '15px' }}>
             Eksplorasi koridor logistik maritim Tanjung Priok/Perak ke pelabuhan dunia, hitung tarif bea masuk komoditas unggulan, dan verifikasi sertifikasi ekspor secara interaktif.
           </p>
@@ -153,8 +153,8 @@ export default function HomePage() {
 
         <div className="home-canvas-banner">
           <div>
-            <p><strong>Konsultasi Suara Dua Arah & Generator PDF Kepabeanan Resmi</strong></p>
-            <p>Bicara langsung dengan AI ekspor atau cetak Commercial Invoice, Packing List, & SKA Form D siap pakai.</p>
+            <p><strong>Konsultasi Suara dan Contoh Draft PDF Perdagangan</strong></p>
+            <p>Jelajahi skenario ekspor atau unduh contoh Commercial Invoice, Packing List, dan SKA Form D.</p>
           </div>
           <button
             type="button"

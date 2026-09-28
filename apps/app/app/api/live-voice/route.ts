@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import WebSocket from 'ws';
 import { tradeAdvisorVoiceSystem } from '@/lib/ai/prompts';
 import { cleanText, guardApi } from '@/lib/api-guard';
+import { guardAiBudget } from '@/lib/ai-budget';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -150,9 +151,9 @@ async function proxyPostMessage(message: GeminiLiveMessage, signal: AbortSignal)
   const received: GeminiLiveMessage[] = [];
 
   return await new Promise<GeminiLiveMessage[]>((resolve, reject) => {
+    let settled = false;
     const timeout = setTimeout(() => {
-      upstream.close(1000, 'post timeout');
-      resolve(received);
+      finish(new Error('Gemini Live response timed out.'));
     }, POST_TIMEOUT_MS);
 
     const cleanup = () => {
@@ -161,35 +162,42 @@ async function proxyPostMessage(message: GeminiLiveMessage, signal: AbortSignal)
     };
 
     const onAbort = () => {
-      cleanup();
-      upstream.close(1000, 'request aborted');
-      reject(new Error('Request aborted.'));
+      finish(new Error('Request aborted.'));
     };
+
+    function finish(error?: Error) {
+      if (settled) return;
+      settled = true;
+      cleanup();
+      if (upstream.readyState === WebSocket.CONNECTING) upstream.terminate();
+      else upstream.close(1000, 'post complete');
+      if (error) reject(error);
+      else resolve(received);
+    }
 
     signal.addEventListener('abort', onAbort);
 
     upstream.on('open', () => {
       sendJson(upstream, setupPayload());
-      sendJson(upstream, outbound);
     });
 
     upstream.on('message', (raw) => {
       const parsed = safeJson(raw);
       const inbound = parsed ? inboundGeminiMessage(parsed) : null;
       if (!inbound) return;
+      if (inbound.setupComplete) sendJson(upstream, outbound);
       received.push(inbound);
       const done = Boolean((inbound.serverContent as any)?.turnComplete || (inbound.serverContent as any)?.generationComplete);
       if (done || received.length >= POST_MAX_MESSAGES) {
-        cleanup();
-        upstream.close(1000, 'post complete');
-        resolve(received);
+        finish();
       }
     });
 
     upstream.on('error', (error) => {
-      cleanup();
-      reject(error);
+      finish(error);
     });
+    upstream.on('close', () => finish(new Error('Gemini Live closed before completing the response.')));
+    if (signal.aborted) onAbort();
   });
 }
 
@@ -202,6 +210,8 @@ export async function GET(request: NextRequest) {
     {
       ok: true,
       configured: Boolean(apiKey()),
+      available: false,
+      reason: 'WebSocket upgrade is not wired in this Next.js deployment. Use recorded voice fallback.',
       websocket: '/api/live-voice',
       upstream: 'Gemini BidiGenerateContent',
       model: process.env.GEMINI_LIVE_MODEL || DEFAULT_MODEL,
@@ -220,12 +230,17 @@ export async function POST(request: NextRequest) {
   }
 
   try {
-    const body = await request.json();
+    const body = await request.json().catch(() => null);
+    if (!body || typeof body !== 'object' || Array.isArray(body) || !outboundClientMessage(body)) {
+      return NextResponse.json({ error: 'realtimeInput or clientContent is required.' }, { status: 400 });
+    }
+    const budgetBlocked = await guardAiBudget();
+    if (budgetBlocked) return budgetBlocked;
     const messages = await proxyPostMessage(body, request.signal);
     return NextResponse.json({ ok: true, messages }, { headers: { 'Cache-Control': 'no-store' } });
   } catch (error) {
     return NextResponse.json(
-      { error: error instanceof Error ? error.message : 'Gemini Live proxy failed.' },
+      { error: 'Gemini Live proxy failed.' },
       { status: 502 },
     );
   }

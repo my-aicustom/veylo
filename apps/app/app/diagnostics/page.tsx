@@ -117,15 +117,14 @@ export default function DiagnosticsPage() {
       } catch {}
 
       if (basic.mediaDevices) {
-        try {
-          const stream = await navigator.mediaDevices.getUserMedia({ audio: true, video: true });
-          basic.microphone = stream.getAudioTracks().length ? 'allowed' : 'missing';
-          basic.camera = stream.getVideoTracks().length ? 'allowed' : 'missing';
-          stream.getTracks().forEach((track) => track.stop());
-        } catch (reason: any) {
-          const name = reason?.name || 'denied';
-          basic.microphone = name;
-          basic.camera = name;
+        for (const device of ['microphone', 'camera'] as const) {
+          try {
+            const stream = await navigator.mediaDevices.getUserMedia({ audio: device === 'microphone', video: device === 'camera' });
+            basic[device] = stream.getTracks().length ? 'allowed' : 'missing';
+            stream.getTracks().forEach((track) => track.stop());
+          } catch (reason: any) {
+            basic[device] = reason?.name || 'denied';
+          }
         }
 
         try {

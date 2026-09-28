@@ -15,3 +15,7 @@ coverage
 .playwright-cli/
 
 .vercel
+output/
+graphify-out/
+CODEX_*.md
+CODEX_*.txt

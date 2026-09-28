@@ -209,7 +209,7 @@ export function CommercialInvoice({ data }: { data: TradeDocData }) {
 
         {data.paymentTerms && (
           <View style={base.section}>
-            <Text style={base.sectionTitle}>Terms & Conditions</Text>
+            <Text style={base.sectionTitle}>Terms &amp; Conditions</Text>
             <Text style={base.label}>{data.paymentTerms}</Text>
           </View>
         )}
@@ -287,7 +287,7 @@ export function SKAFormD({ data }: { data: TradeDocData }) {
 
         <View style={base.section}>
           <Text style={[base.sectionTitle, { color: EMERALD }]}>
-            [DRAFT] DOKUMEN DRAFT — Untuk diproses & ditandatangani oleh Dinas Perdagangan / BKPM yang berwenang
+            [DRAFT] CONTOH DOKUMEN — Verifikasi asal barang dan pengesahan instansi berwenang diperlukan
           </Text>
         </View>
 
@@ -297,10 +297,10 @@ export function SKAFormD({ data }: { data: TradeDocData }) {
         <View style={base.section}>
           <Text style={base.sectionTitle}>Kriteria Asal Barang / Origin Criteria</Text>
           <Text style={{ fontSize: 8, marginBottom: 4 }}>
-            Berdasarkan ATIGA (ASEAN Trade In Goods Agreement) Chapter 3, barang di bawah ini dinyatakan berasal dari Indonesia:
+            Negara asal yang diinput: {data.countryOfOrigin ?? 'Indonesia'}. Kriteria asal dan kelayakan ATIGA belum diverifikasi.
           </Text>
           <Text style={{ fontSize: 8, fontFamily: 'Roboto', fontWeight: 'bold', color: EMERALD }}>
-            "The goods described herein originated in Indonesia and comply with the origin requirements specified for these goods in the ASEAN Trade in Goods Agreement (ATIGA)."
+            "DRAFT ONLY: Origin requirements must be verified by the exporter and the authorized issuing body. This template does not certify origin."
           </Text>
         </View>
 
@@ -334,16 +334,16 @@ export function SKAFormD({ data }: { data: TradeDocData }) {
             <Text style={{ fontSize: 8, color: SLATE, marginBottom: 12 }}>
               Saya menyatakan bahwa keterangan dalam dokumen ini adalah benar dan barang memenuhi syarat sebagai produk Indonesia.
             </Text>
-            <Text style={{ fontSize: 8 }}>Nama & Tanda Tangan Eksportir: ________________________</Text>
-            <Text style={{ fontSize: 8, marginTop: 8 }}>Tanggal & Stempel: ________________________</Text>
+            <Text style={{ fontSize: 8 }}>Nama &amp; Tanda Tangan Eksportir: ________________________</Text>
+            <Text style={{ fontSize: 8, marginTop: 8 }}>Tanggal &amp; Stempel: ________________________</Text>
           </View>
           <View style={[base.col, { borderTop: `1 solid ${BORDER}`, paddingTop: 8 }]}>
             <Text style={base.sectionTitle}>Pengesahan Instansi Penerbit</Text>
             <Text style={{ fontSize: 8, color: SLATE, marginBottom: 12 }}>
-              Dokumen ini disahkan oleh instansi penerbit SKA yang berwenang sesuai Permendag No. 53/2021.
+              Belum disahkan. Ajukan dokumen dan bukti asal kepada instansi penerbit SKA yang berwenang.
             </Text>
             <Text style={{ fontSize: 8 }}>Pejabat Penerbit: ________________________</Text>
-            <Text style={{ fontSize: 8, marginTop: 8 }}>Cap & Tanda Tangan Instansi: ________________________</Text>
+            <Text style={{ fontSize: 8, marginTop: 8 }}>Cap &amp; Tanda Tangan Instansi: ________________________</Text>
           </View>
         </View>
 
