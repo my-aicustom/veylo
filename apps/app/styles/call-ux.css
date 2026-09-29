@@ -75,6 +75,28 @@
   outline:none;
 }
 .language-control select:focus-visible { border-color:var(--accent); }
+.locode-badge {
+  min-height:34px;
+  display:inline-flex;
+  align-items:center;
+  justify-content:center;
+  padding:0 9px;
+  border:1px solid rgba(0,229,255,.28);
+  border-radius:9px;
+  background:rgba(255,255,255,.05);
+  color:#67e8f9;
+  font-family:ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
+  font-size:10px;
+  font-weight:750;
+  white-space:nowrap;
+}
+.map-locode-pill rect { fill:rgba(255,255,255,.08); stroke:rgba(103,232,249,.36); }
+.map-locode-pill text {
+  fill:#67e8f9;
+  font-family:ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
+  font-size:10px;
+  font-weight:750;
+}
 .sr-only {
   position:absolute;
   width:1px;
@@ -132,6 +154,54 @@
 .transcript-actions-wrap { flex-wrap:wrap; }
 .compact-error { margin:10px 15px; }
 
+.inbound-deal-card {
+  margin:0 14px 12px;
+  padding:13px 14px;
+  border:1px solid rgba(103,232,249,.28);
+  border-radius:12px;
+  background:linear-gradient(135deg, rgba(103,232,249,.09), rgba(217,255,99,.05));
+}
+.inbound-deal-card > span {
+  display:block;
+  color:#67e8f9;
+  font-size:9px;
+  font-weight:800;
+  letter-spacing:.1em;
+  text-transform:uppercase;
+  margin-bottom:6px;
+}
+.inbound-deal-card > strong {
+  display:block;
+  color:var(--text);
+  font-size:13px;
+  line-height:1.25;
+  margin-bottom:10px;
+}
+.inbound-deal-card dl {
+  margin:0;
+  display:grid;
+  grid-template-columns:1fr 1fr;
+  gap:8px;
+}
+.inbound-deal-card div { min-width:0; }
+.inbound-deal-card dt {
+  color:var(--soft);
+  font-size:9px;
+  text-transform:uppercase;
+  letter-spacing:.08em;
+}
+.inbound-deal-card dd {
+  margin:2px 0 0;
+  color:#dce3e0;
+  font-size:11px;
+  line-height:1.35;
+  overflow-wrap:anywhere;
+}
+.inbound-actions {
+  margin-top:11px;
+  padding-top:10px;
+}
+
 .meeting-intelligence-card {
   margin:0 14px 14px;
   border:1px solid var(--line-strong);
@@ -167,6 +237,8 @@
 @media (max-width: 620px) {
   .audio-route-control { grid-template-columns:1fr; }
   .audio-route-control small { grid-column:auto; }
+  .locode-badge { width:100%; }
+  .inbound-deal-card dl { grid-template-columns:1fr; }
   .meeting-brief-title { flex-direction:column; gap:6px; }
   .meeting-brief-title small { text-align:left; }
   .device-note { flex-direction:column; }

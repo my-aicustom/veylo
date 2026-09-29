@@ -16,7 +16,9 @@ const routes = [
     "id": "singapore",
     "label": "Koridor A",
     "from": "Tanjung Priok",
+    "fromLocode": "IDJKT",
     "to": "Port of Singapore",
+    "toLocode": "SGSIN",
     "region": "Hub ASEAN / Global",
     "transitSea": "2-3 hari",
     "transitAir": "1.5 jam",
@@ -34,7 +36,9 @@ const routes = [
     "id": "shanghai",
     "label": "Koridor B",
     "from": "Tanjung Priok",
+    "fromLocode": "IDJKT",
     "to": "Port of Shanghai (Yangshan)",
+    "toLocode": "CNSHA",
     "region": "East Asia Mega Hub",
     "transitSea": "8-12 hari",
     "transitAir": "6-8 jam",
@@ -52,7 +56,9 @@ const routes = [
     "id": "tokyo",
     "label": "Koridor C",
     "from": "Tanjung Priok",
+    "fromLocode": "IDJKT",
     "to": "Port of Yokohama / Tokyo",
+    "toLocode": "JPYOK",
     "region": "Jepang / Pasifik",
     "transitSea": "10-14 hari",
     "transitAir": "7-9 jam",
@@ -70,7 +76,9 @@ const routes = [
     "id": "los-angeles",
     "label": "Koridor D",
     "from": "Tanjung Priok",
+    "fromLocode": "IDJKT",
     "to": "Port of Los Angeles (POLA)",
+    "toLocode": "USLAX",
     "region": "Amerika Serikat / Pantai Barat",
     "transitSea": "22-28 hari",
     "transitAir": "19-24 jam",
@@ -88,7 +96,9 @@ const routes = [
     "id": "rotterdam",
     "label": "Koridor E",
     "from": "Tanjung Perak / Priok",
+    "fromLocode": "IDJKT",
     "to": "Port of Rotterdam",
+    "toLocode": "NLRTM",
     "region": "Uni Eropa",
     "transitSea": "24-28 hari",
     "transitAir": "16-22 jam",
@@ -106,7 +116,9 @@ const routes = [
     "id": "jebel-ali",
     "label": "Koridor F",
     "from": "Tanjung Priok",
+    "fromLocode": "IDJKT",
     "to": "Port of Jebel Ali (Dubai)",
+    "toLocode": "AEJEA",
     "region": "Timur Tengah / GCC Hub",
     "transitSea": "14-18 hari",
     "transitAir": "8-11 jam",
@@ -124,7 +136,9 @@ const routes = [
     "id": "sydney",
     "label": "Koridor G",
     "from": "Tanjung Priok",
+    "fromLocode": "IDJKT",
     "to": "Port Botany (Sydney)",
+    "toLocode": "AUSYD",
     "region": "Australia / Oseania",
     "transitSea": "12-16 hari",
     "transitAir": "7-10 jam",
@@ -142,7 +156,9 @@ const routes = [
     "id": "douala",
     "label": "Koridor H",
     "from": "Tanjung Priok",
+    "fromLocode": "IDJKT",
     "to": "Port of Douala",
+    "toLocode": "CMDLA",
     "region": "Afrika Barat",
     "transitSea": "28-35 hari",
     "transitAir": "19-25 jam",
@@ -316,6 +332,7 @@ function RouteVisualizer({ routeId, onRouteChange }: { routeId: string; onRouteC
         <select aria-label="Select cargo route" value={routeId} onChange={(event) => onRouteChange(event.target.value)}>
           {routes.map((route) => <option key={route.id} value={route.id}>{route.label} - {route.to}</option>)}
         </select>
+        <span className="locode-badge">{selected.fromLocode} → {selected.toLocode}</span>
       </div>
 
       <svg className="cargo-map" viewBox="0 0 820 320" role="img" aria-label={`${selected.from} to ${selected.to}`}>
@@ -344,9 +361,14 @@ function RouteVisualizer({ routeId, onRouteChange }: { routeId: string; onRouteC
         <MapMarker x={713} y={173} label="Douala" active={selected.id === 'douala'} />
         <MapMarker x={748} y={92} label="Rotterdam" active={selected.id === 'rotterdam'} />
         <MapMarker x={665} y={139} label="Jebel Ali" active={selected.id === 'jebel-ali'} />
+        <g className="map-locode-pill" transform="translate(28 28)">
+          <rect width="138" height="25" rx="7" />
+          <text x="69" y="17" textAnchor="middle">{selected.fromLocode} → {selected.toLocode}</text>
+        </g>
       </svg>
 
       <div className="route-stats">
+        <div><span>UN/LOCODE</span><strong>{selected.fromLocode} → {selected.toLocode}</strong></div>
         <div><span>Transit</span><strong>{mode === 'sea' ? selected.transitSea : selected.transitAir}</strong></div>
         {mode === 'sea' && <div><span>20ft est.</span><strong>USD {selected.rate20.toLocaleString('en-US')}</strong></div>}
         {mode === 'sea' && <div><span>40ft est.</span><strong>USD {selected.rate40.toLocaleString('en-US')}</strong></div>}

@@ -12,10 +12,20 @@ import {
   loadMeetingIntelligence,
   saveMeetingIntelligence,
 } from '@/lib/meeting-intelligence';
+import { apiUrl } from '@/lib/paths';
 import { listAudioDevices, type AudioDeviceChoice } from '@/lib/audio-devices';
 import { ALL_LANGUAGE_CODES } from '@/lib/countries';
 import { glossaryToInput, loadSessionGlossary, parseGlossary, saveSessionGlossary } from '@/lib/session-glossary';
 import type { MeetingIntelligence, Profile } from '@/lib/types';
+
+interface InboundDealContext {
+  ikmName?: string;
+  productName?: string;
+  fobPrice?: number;
+  hsCode?: string;
+  buyerName?: string;
+  buyerCountry?: string;
+}
 
 function formatLatency(value?: number) {
   if (value === undefined || !Number.isFinite(value)) return '—';
@@ -39,9 +49,11 @@ export function InterpreterPanel({
   const [outputSelectionSupported, setOutputSelectionSupported] = React.useState(false);
   const [report, setReport] = React.useState<MeetingIntelligence | null>(null);
   const [reportBusy, setReportBusy] = React.useState(false);
+  const [invoiceBusy, setInvoiceBusy] = React.useState(false);
   const [reportError, setReportError] = React.useState('');
   const [reportOpen, setReportOpen] = React.useState(false);
   const [glossaryInput, setGlossaryInput] = React.useState('');
+  const [inboundDeal, setInboundDeal] = React.useState<InboundDealContext | null>(null);
 
   const sessionId = `live:${roomName}`;
   const languageStorageKey = React.useMemo(() => `veylo:room-language:${roomName}`, [roomName]);
@@ -57,6 +69,22 @@ export function InterpreterPanel({
     setReport(loadMeetingIntelligence(sessionId));
     setGlossaryInput(glossaryToInput(loadSessionGlossary(sessionId)));
   }, [languageStorageKey, outputStorageKey, sessionId]);
+
+  React.useEffect(() => {
+    const search = new URLSearchParams(window.location.search);
+    const deal: InboundDealContext = {
+      ikmName: search.get('ikmName') || undefined,
+      productName: search.get('productName') || undefined,
+      fobPrice: Number(search.get('fobPrice')) || undefined,
+      hsCode: search.get('hsCode') || undefined,
+      buyerName: search.get('buyerName') || undefined,
+      buyerCountry: search.get('buyerCountry') || undefined,
+    };
+    if (deal.ikmName || deal.productName || deal.hsCode || deal.buyerName) {
+      setInboundDeal(deal);
+      setReportOpen(true);
+    }
+  }, []);
 
   const refreshOutputs = React.useCallback(async () => {
     try {
@@ -128,6 +156,64 @@ export function InterpreterPanel({
     clearMeetingIntelligence(sessionId);
   }, [clear, sessionId]);
 
+  const exportCommercialInvoice = React.useCallback(async () => {
+    if (invoiceBusy) return;
+    setInvoiceBusy(true);
+    setReportError('');
+    try {
+      const reportItem = report?.commercialItems[0];
+      const parsedPrice = reportItem?.price ? Number(reportItem.price.replace(/[^0-9.]/g, '')) : 0;
+      const unitPrice = inboundDeal?.fobPrice || parsedPrice || 1;
+      const itemDescription = inboundDeal?.productName || reportItem?.product || 'Produk Ekspor Indonesia';
+      const payload = {
+        type: 'invoice',
+        docType: 'invoice',
+        data: {
+          exporterName: inboundDeal?.ikmName || report?.parties.find((party) => /export|seller|ikm/i.test([party.role, party.company].filter(Boolean).join(' ')))?.company || 'IKM Tangerang Selatan',
+          exporterAddress: 'Tangerang Selatan, Banten, Indonesia',
+          importerName: inboundDeal?.buyerName || report?.parties.find((party) => /import|buyer/i.test([party.role, party.company].filter(Boolean).join(' ')))?.company || 'Buyer TEI 2026',
+          importerAddress: inboundDeal?.buyerCountry || '',
+          importerCountry: inboundDeal?.buyerCountry || '',
+          portOfLoading: 'Port of Tanjung Priok, Jakarta (IDJKT)',
+          portOfDischarge: inboundDeal?.buyerCountry || '',
+          incoterms: reportItem?.incoterm || 'FOB',
+          countryOfOrigin: 'Indonesia',
+          items: [
+            {
+              description: itemDescription,
+              hsCode: inboundDeal?.hsCode || '0000.00.00',
+              qty: 1,
+              unit: reportItem?.unit || 'lot',
+              unitPrice,
+              currency: reportItem?.currency || 'USD',
+            },
+          ],
+        },
+      };
+
+      const response = await fetch(apiUrl('/api/export-doc'), {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      });
+      if (!response.ok) throw new Error('Failed to generate invoice PDF');
+
+      const blob = await response.blob();
+      const url = URL.createObjectURL(blob);
+      const anchor = document.createElement('a');
+      anchor.href = url;
+      anchor.download = 'veylo-commercial-invoice.pdf';
+      document.body.appendChild(anchor);
+      anchor.click();
+      anchor.remove();
+      setTimeout(() => URL.revokeObjectURL(url), 1000);
+    } catch (error) {
+      setReportError(error instanceof Error ? error.message : 'Could not export commercial invoice');
+    } finally {
+      setInvoiceBusy(false);
+    }
+  }, [inboundDeal, invoiceBusy, report]);
+
   return (
     <aside className={`interpreter-panel ${open ? 'open' : 'closed'}`}>
       <div className="interpreter-head">
@@ -144,6 +230,24 @@ export function InterpreterPanel({
 
       {open && (
         <>
+          {inboundDeal && (
+            <div className="inbound-deal-card">
+              <span>Inbound Deal Context (TEI 2026)</span>
+              <strong>{inboundDeal.productName || 'Produk ekspor Tangsel'}</strong>
+              <dl>
+                <div><dt>Exporter IKM</dt><dd>{inboundDeal.ikmName || 'IKM Tangerang Selatan'}</dd></div>
+                <div><dt>HS Code</dt><dd>{inboundDeal.hsCode || '-'}</dd></div>
+                <div><dt>Target FOB</dt><dd>{inboundDeal.fobPrice ? `USD ${inboundDeal.fobPrice.toFixed(2)}` : '-'}</dd></div>
+                <div><dt>Buyer</dt><dd>{[inboundDeal.buyerName, inboundDeal.buyerCountry].filter(Boolean).join(' · ') || '-'}</dd></div>
+              </dl>
+              <div className="report-actions inbound-actions">
+                <button className="text-button" onClick={() => void exportCommercialInvoice()} disabled={invoiceBusy}>
+                  {invoiceBusy ? 'Exporting invoice...' : 'Export Commercial Invoice (PDF)'}
+                </button>
+              </div>
+            </div>
+          )}
+
           <div className="language-route language-control">
             <span>{source} →</span>
             <label>
@@ -263,6 +367,9 @@ export function InterpreterPanel({
                   <div className="report-actions">
                     <button className="text-button" onClick={() => downloadMeetingBrief(report, roomName)}>Download brief</button>
                     <button className="text-button" onClick={() => downloadMeetingJson(report, roomName)}>Export JSON</button>
+                    <button className="text-button" onClick={() => void exportCommercialInvoice()} disabled={invoiceBusy}>
+                      {invoiceBusy ? 'Exporting invoice...' : 'Export Commercial Invoice (PDF)'}
+                    </button>
                   </div>
                 </div>
               )}

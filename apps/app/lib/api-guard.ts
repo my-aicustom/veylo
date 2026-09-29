@@ -10,6 +10,11 @@ declare global {
 const counters = globalThis.__veyloRateLimits ?? new Map<string, Counter>();
 globalThis.__veyloRateLimits = counters;
 
+const TRUSTED_CROSS_ORIGINS = new Set([
+  'https://tangsel-export-ai.vercel.app',
+  'http://localhost:4321',
+]);
+
 function clientId(request: NextRequest) {
   // In production, nginx overwrites X-Real-IP with the socket peer address.
   // Direct dev requests fall back to a stable local bucket.
@@ -37,7 +42,7 @@ export function guardApi(
 ) {
   const origin = request.headers.get('origin');
   const expected = expectedOrigin(request);
-  if (origin && expected && origin !== expected) {
+  if (origin && expected && origin !== expected && !TRUSTED_CROSS_ORIGINS.has(origin)) {
     return NextResponse.json({ error: 'Cross-origin request rejected.' }, { status: 403 });
   }
 
