@@ -27,6 +27,20 @@ interface InboundDealContext {
   buyerCountry?: string;
 }
 
+type ExportDocType = 'invoice' | 'packing-list' | 'ska-form-d';
+
+const EXPORT_DOC_LABELS: Record<ExportDocType, string> = {
+  invoice: '📄 Commercial Invoice (PDF)',
+  'packing-list': '📦 Packing List (PDF)',
+  'ska-form-d': '🏛️ SKA Form D / COO (PDF)',
+};
+
+const EXPORT_DOC_FILES: Record<ExportDocType, string> = {
+  invoice: 'veylo-commercial-invoice.pdf',
+  'packing-list': 'veylo-packing-list.pdf',
+  'ska-form-d': 'veylo-ska-form-d.pdf',
+};
+
 function formatLatency(value?: number) {
   if (value === undefined || !Number.isFinite(value)) return '—';
   return value >= 1000 ? `${(value / 1000).toFixed(2)}s` : `${Math.round(value)}ms`;
@@ -49,7 +63,7 @@ export function InterpreterPanel({
   const [outputSelectionSupported, setOutputSelectionSupported] = React.useState(false);
   const [report, setReport] = React.useState<MeetingIntelligence | null>(null);
   const [reportBusy, setReportBusy] = React.useState(false);
-  const [invoiceBusy, setInvoiceBusy] = React.useState(false);
+  const [docBusy, setDocBusy] = React.useState<ExportDocType | null>(null);
   const [reportError, setReportError] = React.useState('');
   const [reportOpen, setReportOpen] = React.useState(false);
   const [glossaryInput, setGlossaryInput] = React.useState('');
@@ -156,39 +170,46 @@ export function InterpreterPanel({
     clearMeetingIntelligence(sessionId);
   }, [clear, sessionId]);
 
-  const exportCommercialInvoice = React.useCallback(async () => {
-    if (invoiceBusy) return;
-    setInvoiceBusy(true);
+  const exportDocPdf = React.useCallback(async (docType: ExportDocType) => {
+    if (docBusy) return;
+    setDocBusy(docType);
     setReportError('');
     try {
       const reportItem = report?.commercialItems[0];
       const parsedPrice = reportItem?.price ? Number(reportItem.price.replace(/[^0-9.]/g, '')) : 0;
       const unitPrice = inboundDeal?.fobPrice || parsedPrice || 1;
       const itemDescription = inboundDeal?.productName || reportItem?.product || 'Produk Ekspor Indonesia';
+      const quantity = Number(reportItem?.quantity?.replace(/[^0-9.]/g, '')) || 1;
+      const unit = reportItem?.unit || 'lot';
+      const tradeDocData = {
+        exporterName: inboundDeal?.ikmName || report?.parties.find((party) => /export|seller|ikm/i.test([party.role, party.company].filter(Boolean).join(' ')))?.company || 'IKM Tangerang Selatan',
+        exporterAddress: 'Tangerang Selatan, Banten, Indonesia',
+        importerName: inboundDeal?.buyerName || report?.parties.find((party) => /import|buyer/i.test([party.role, party.company].filter(Boolean).join(' ')))?.company || 'Buyer TEI 2026',
+        importerAddress: inboundDeal?.buyerCountry || '',
+        importerCountry: inboundDeal?.buyerCountry || '',
+        portOfLoading: 'Port of Tanjung Priok, Jakarta (IDJKT)',
+        portOfDischarge: inboundDeal?.buyerCountry || '',
+        incoterms: reportItem?.incoterm || 'FOB',
+        countryOfOrigin: 'Indonesia',
+        items: [
+          {
+            description: itemDescription,
+            hsCode: inboundDeal?.hsCode || '0000.00.00',
+            qty: quantity,
+            unit,
+            unitPrice,
+            currency: reportItem?.currency || 'USD',
+            grossWeightKg: quantity,
+            netWeightKg: Number((quantity * 0.95).toFixed(2)),
+            cbm: Number(Math.max(quantity * 0.002, 0.01).toFixed(3)),
+            cartons: Math.max(1, Math.ceil(quantity)),
+          },
+        ],
+      };
       const payload = {
-        type: 'invoice',
-        docType: 'invoice',
-        data: {
-          exporterName: inboundDeal?.ikmName || report?.parties.find((party) => /export|seller|ikm/i.test([party.role, party.company].filter(Boolean).join(' ')))?.company || 'IKM Tangerang Selatan',
-          exporterAddress: 'Tangerang Selatan, Banten, Indonesia',
-          importerName: inboundDeal?.buyerName || report?.parties.find((party) => /import|buyer/i.test([party.role, party.company].filter(Boolean).join(' ')))?.company || 'Buyer TEI 2026',
-          importerAddress: inboundDeal?.buyerCountry || '',
-          importerCountry: inboundDeal?.buyerCountry || '',
-          portOfLoading: 'Port of Tanjung Priok, Jakarta (IDJKT)',
-          portOfDischarge: inboundDeal?.buyerCountry || '',
-          incoterms: reportItem?.incoterm || 'FOB',
-          countryOfOrigin: 'Indonesia',
-          items: [
-            {
-              description: itemDescription,
-              hsCode: inboundDeal?.hsCode || '0000.00.00',
-              qty: 1,
-              unit: reportItem?.unit || 'lot',
-              unitPrice,
-              currency: reportItem?.currency || 'USD',
-            },
-          ],
-        },
+        type: docType,
+        docType,
+        data: tradeDocData,
       };
 
       const response = await fetch(apiUrl('/api/export-doc'), {
@@ -202,17 +223,38 @@ export function InterpreterPanel({
       const url = URL.createObjectURL(blob);
       const anchor = document.createElement('a');
       anchor.href = url;
-      anchor.download = 'veylo-commercial-invoice.pdf';
+      anchor.download = EXPORT_DOC_FILES[docType];
       document.body.appendChild(anchor);
       anchor.click();
       anchor.remove();
       setTimeout(() => URL.revokeObjectURL(url), 1000);
+
+      void fetch(apiUrl('/api/deals'), {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          roomName,
+          docType,
+          source: 'interpreter-panel',
+          deal: {
+            inboundDeal,
+            document: docType,
+            exporterName: tradeDocData.exporterName,
+            importerName: tradeDocData.importerName,
+            itemDescription,
+            hsCode: inboundDeal?.hsCode || '0000.00.00',
+            unitPrice,
+            currency: reportItem?.currency || 'USD',
+            reportSummary: report?.summary,
+          },
+        }),
+      }).catch(() => {});
     } catch (error) {
-      setReportError(error instanceof Error ? error.message : 'Could not export commercial invoice');
+      setReportError(error instanceof Error ? error.message : 'Could not export document');
     } finally {
-      setInvoiceBusy(false);
+      setDocBusy(null);
     }
-  }, [inboundDeal, invoiceBusy, report]);
+  }, [docBusy, inboundDeal, report, roomName]);
 
   return (
     <aside className={`interpreter-panel ${open ? 'open' : 'closed'}`}>
@@ -241,9 +283,11 @@ export function InterpreterPanel({
                 <div><dt>Buyer</dt><dd>{[inboundDeal.buyerName, inboundDeal.buyerCountry].filter(Boolean).join(' · ') || '-'}</dd></div>
               </dl>
               <div className="report-actions inbound-actions">
-                <button className="text-button" onClick={() => void exportCommercialInvoice()} disabled={invoiceBusy}>
-                  {invoiceBusy ? 'Exporting invoice...' : 'Export Commercial Invoice (PDF)'}
-                </button>
+                {(Object.keys(EXPORT_DOC_LABELS) as ExportDocType[]).map((docType) => (
+                  <button key={docType} className="text-button" onClick={() => void exportDocPdf(docType)} disabled={docBusy !== null}>
+                    {docBusy === docType ? 'Exporting...' : EXPORT_DOC_LABELS[docType]}
+                  </button>
+                ))}
               </div>
             </div>
           )}
@@ -367,9 +411,11 @@ export function InterpreterPanel({
                   <div className="report-actions">
                     <button className="text-button" onClick={() => downloadMeetingBrief(report, roomName)}>Download brief</button>
                     <button className="text-button" onClick={() => downloadMeetingJson(report, roomName)}>Export JSON</button>
-                    <button className="text-button" onClick={() => void exportCommercialInvoice()} disabled={invoiceBusy}>
-                      {invoiceBusy ? 'Exporting invoice...' : 'Export Commercial Invoice (PDF)'}
-                    </button>
+                    {(Object.keys(EXPORT_DOC_LABELS) as ExportDocType[]).map((docType) => (
+                      <button key={docType} className="text-button" onClick={() => void exportDocPdf(docType)} disabled={docBusy !== null}>
+                        {docBusy === docType ? 'Exporting...' : EXPORT_DOC_LABELS[docType]}
+                      </button>
+                    ))}
                   </div>
                 </div>
               )}
