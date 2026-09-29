@@ -63,7 +63,7 @@ Rules for recommendedView & recommendedRoute:
     messages.push({ role: 'user', content: message });
 
     // Call OpenRouter API
-    const completion = (await chat(messages, 0.2, 500)) as any;
+    const completion = (await chat(messages, { temperature: 0.2, maxTokens: 600, enableWebSearch: true })) as any;
     void recordAiUsage(completion);
     const content = completion?.choices?.[0]?.message?.content;
 

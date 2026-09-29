@@ -258,6 +258,12 @@ h1 { margin: 0; font-size: clamp(42px, 7vw, 92px); line-height: .95; letter-spac
 .tool-shell { padding: 0 30px 30px; }
 .tool-header { max-width: 1220px; margin: 0 auto; }
 .tool-grid { max-width: 1220px; margin: 7vh auto 0; display: grid; grid-template-columns: minmax(0, .95fr) minmax(360px, 1.05fr); gap: 14px; align-items: start; }
+.simulation-grid { max-width: 1380px; margin: 32px auto 0; display: grid; gap: 14px; }
+.simulation-live-grid { display: grid; grid-template-columns: minmax(0, .92fr) minmax(420px, 1.08fr); gap: 14px; align-items: start; }
+.simulation-canvas-panel { position: sticky; top: 18px; display: grid; gap: 10px; }
+.simulation-canvas-tabs { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 6px; padding: 6px; border: 1px solid var(--line); border-radius: 14px; background: #101312; }
+.simulation-canvas-tabs button { min-height: 38px; padding: 0 10px; border: 0; border-radius: 10px; background: transparent; color: var(--muted); font-size: 11px; font-weight: 750; }
+.simulation-canvas-tabs button[aria-selected="true"] { background: var(--accent); color: var(--accent-ink); }
 .setup-card, .transcript-card { background: var(--panel); border: 1px solid var(--line); border-radius: var(--radius); padding: 26px; }
 .setup-card h1 { font-size: clamp(34px, 5vw, 62px); margin-bottom: 34px; }
 .face-setup { border-top: 2px solid var(--accent-warm); }
@@ -305,6 +311,8 @@ h1 { margin: 0; font-size: clamp(42px, 7vw, 92px); line-height: .95; letter-spac
   .dual-entry-grid { grid-template-columns: 1fr; }
   .consultation-grid { grid-template-columns: 1fr; }
   .context-panel { position: static; }
+  .simulation-live-grid { grid-template-columns: 1fr; }
+  .simulation-canvas-panel { position: static; }
   .compliance-radar { grid-template-columns: 1fr; }
   .readiness-gauge { width: min(240px, 100%); justify-self: center; }
   .tariff-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
@@ -342,6 +350,8 @@ h1 { margin: 0; font-size: clamp(42px, 7vw, 92px); line-height: .95; letter-spac
   .call-topbar > div:first-child span { display: none; }
   .translated-caption { font-size: 18px; }
   .tool-grid { margin-top: 24px; }
+  .simulation-grid { margin-top: 24px; }
+  .simulation-canvas-tabs { grid-template-columns: 1fr 1fr; }
   .setup-card, .transcript-card, .join-card, .prejoin-card { padding: 20px; }
   .route-card { grid-template-columns: 1fr; }
   .route-card > div:last-child { text-align: left; }

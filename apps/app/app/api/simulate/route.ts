@@ -40,7 +40,7 @@ export async function POST(request: NextRequest) {
     const budgetBlocked = await guardAiBudget();
     if (budgetBlocked) return budgetBlocked;
 
-    const result: any = await chat(messages, 0.65);
+    const result: any = await chat(messages, { temperature: 0.65, enableWebSearch: true });
     await recordAiUsage(result);
 
     const reply = result?.choices?.[0]?.message?.content?.trim();

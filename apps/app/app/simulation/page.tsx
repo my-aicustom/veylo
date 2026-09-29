@@ -11,8 +11,17 @@ import { isRecentSpeechEcho } from '@/lib/echo-guard';
 import { playSpeech, simulate, transcribe, translate } from '@/lib/client-ai';
 import { listAudioDevices, type AudioDeviceChoice } from '@/lib/audio-devices';
 import { clearSimulation, downloadSimulation, loadSimulation, saveSimulation, type SimulationTurn } from '@/lib/simulation-persistence';
+import { detectSimulationCanvasIntent, latestSimulationCanvasIntent, type VisualCanvasRoute } from '@/lib/simulation-canvas-intent';
 import type { Profile } from '@/lib/types';
 import { ProfileForm } from '@/components/ProfileForm';
+import { VisualCanvas, type VisualCanvasView } from '@/components/VisualCanvas';
+
+const canvasTabs: Array<{ view: VisualCanvasView; label: string }> = [
+  { view: 'routes', label: 'Peta Rute' },
+  { view: 'tariff', label: 'Tarif HS Code' },
+  { view: 'compliance', label: 'Kepatuhan' },
+  { view: 'market', label: 'Benchmark Pasar' },
+];
 
 export default function SimulationPage() {
   const router = useRouter();
@@ -30,6 +39,8 @@ export default function SimulationPage() {
   const [inputDeviceId, setInputDeviceId] = React.useState('default');
   const [outputDeviceId, setOutputDeviceId] = React.useState('default');
   const [outputSelectionSupported, setOutputSelectionSupported] = React.useState(false);
+  const [canvasView, setCanvasView] = React.useState<VisualCanvasView>('routes');
+  const [canvasRoute, setCanvasRoute] = React.useState<VisualCanvasRoute>('singapore');
   const recorderRef = React.useRef<PhraseRecorder | null>(null);
   const queueRef = React.useRef<Promise<void>>(Promise.resolve());
   const turnsRef = React.useRef<SimulationTurn[]>([]);
@@ -39,6 +50,13 @@ export default function SimulationPage() {
   const recentSpokenTexts = React.useRef<{ text: string; at: number }[]>([]);
   const sessionRef = React.useRef(0);
   const playbackRef = React.useRef<Promise<void> | null>(null);
+
+  const updateCanvasFromText = React.useCallback((text: string) => {
+    const intent = detectSimulationCanvasIntent(text);
+    if (!intent) return;
+    setCanvasView(intent.view);
+    if (intent.route) setCanvasRoute(intent.route);
+  }, []);
 
   const refreshDevices = React.useCallback(async () => {
     try {
@@ -63,6 +81,11 @@ export default function SimulationPage() {
     const restored = loadSimulation(sessionId);
     turnsRef.current = restored;
     setTurns(restored);
+    const restoredIntent = latestSimulationCanvasIntent(restored);
+    if (restoredIntent) {
+      setCanvasView(restoredIntent.view);
+      if (restoredIntent.route) setCanvasRoute(restoredIntent.route);
+    }
   }, [sessionId]);
   React.useEffect(() => { turnsRef.current = turns; }, [turns]);
   React.useEffect(() => () => {
@@ -124,6 +147,7 @@ export default function SimulationPage() {
     };
     const history = [...turnsRef.current, userTurn];
     commit(history);
+    updateCanvasFromText(text);
     setStatus('Counterpart is responding…');
 
     const result = await simulate({
@@ -149,6 +173,7 @@ export default function SimulationPage() {
     };
     const next = [...turnsRef.current, aiTurn];
     commit(next);
+    updateCanvasFromText(result.reply);
     setStatus('Speaking…');
 
     const subtitlePromise = language.toLowerCase() !== profile.preferredLanguage.toLowerCase()
@@ -278,7 +303,7 @@ export default function SimulationPage() {
         <div><strong>AI Simulation</strong><span aria-live="polite">{status}</span></div>
       </header>
 
-      <section className="tool-grid">
+      <section className="simulation-grid">
         <div className="setup-card simulation-setup">
           <div className="eyebrow">PRACTICE / INTERNATIONAL CONVERSATION</div>
           <h1>{role}</h1>
@@ -307,22 +332,41 @@ export default function SimulationPage() {
           </details>
         </div>
 
-        <div className="transcript-card" aria-live="polite">
-          <div className="transcript-card-head">
-            <div><div className="eyebrow">CONVERSATION</div><small>Simulation history is retained locally for this scenario.</small></div>
-            {turns.length > 0 && <div className="transcript-card-actions"><button className="ghost small" onClick={() => downloadSimulation(turns, role, countryName(country))}>Download</button><button className="ghost small" onClick={resetSimulation}>Clear</button></div>}
-          </div>
-          {turns.length === 0 ? (
-            <p className="empty-caption">Your simulated conversation will appear here.</p>
-          ) : turns.map((turn) => (
-            <div className={`turn ${turn.speaker}`} key={turn.id}>
-              <span>{turn.speaker === 'you' ? profile.name : role}</span>
-              <p>{turn.text}</p>
-              {turn.speaker === 'ai' && turn.translation && (
-                <p className="sim-translation">{turn.translation}</p>
-              )}
+        <div className="simulation-live-grid">
+          <div className="transcript-card" aria-live="polite">
+            <div className="transcript-card-head">
+              <div><div className="eyebrow">CONVERSATION</div><small>Simulation history is retained locally for this scenario.</small></div>
+              {turns.length > 0 && <div className="transcript-card-actions"><button className="ghost small" onClick={() => downloadSimulation(turns, role, countryName(country))}>Download</button><button className="ghost small" onClick={resetSimulation}>Clear</button></div>}
             </div>
-          ))}
+            {turns.length === 0 ? (
+              <p className="empty-caption">Your simulated conversation will appear here.</p>
+            ) : turns.map((turn) => (
+              <div className={`turn ${turn.speaker}`} key={turn.id}>
+                <span>{turn.speaker === 'you' ? profile.name : role}</span>
+                <p>{turn.text}</p>
+                {turn.speaker === 'ai' && turn.translation && (
+                  <p className="sim-translation">{turn.translation}</p>
+                )}
+              </div>
+            ))}
+          </div>
+
+          <aside className="simulation-canvas-panel" aria-label="Live visual trade data">
+            <div className="simulation-canvas-tabs" role="tablist" aria-label="Quick canvas views">
+              {canvasTabs.map((tab) => (
+                <button
+                  key={tab.view}
+                  type="button"
+                  role="tab"
+                  aria-selected={canvasView === tab.view}
+                  onClick={() => setCanvasView(tab.view)}
+                >
+                  {tab.label}
+                </button>
+              ))}
+            </div>
+            <VisualCanvas activeView={canvasView} activeRoute={canvasRoute} onViewChange={setCanvasView} />
+          </aside>
         </div>
       </section>
     </main>

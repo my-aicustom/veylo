@@ -162,14 +162,34 @@ export async function stt(audioBase64: string, format: string, language?: string
   }
 }
 
-export async function chat(messages: unknown[], temperature = 0.1, maxTokens = 900) {
+export interface ChatOptions {
+  temperature?: number;
+  maxTokens?: number;
+  enableWebSearch?: boolean;
+}
+
+export async function chat(
+  messages: unknown[],
+  optionsOrTemp: number | ChatOptions = 0.1,
+  fallbackMaxTokens = 900
+) {
+  const options =
+    typeof optionsOrTemp === 'number'
+      ? { temperature: optionsOrTemp, maxTokens: fallbackMaxTokens }
+      : optionsOrTemp;
+
+  const temperature = options.temperature ?? 0.1;
+  const maxTokens = options.maxTokens ?? 900;
+  const enableWebSearch =
+    options.enableWebSearch ?? (process.env.OPENROUTER_ENABLE_WEB_SEARCH === 'true');
+
   const sort = process.env.OPENROUTER_PROVIDER_SORT;
   const provider =
     sort === 'latency' || sort === 'throughput' || sort === 'price'
       ? { sort, allow_fallbacks: true }
       : undefined;
 
-  return request('/chat/completions', {
+  const body: Record<string, unknown> = {
     model: process.env.TRANSLATION_MODEL || 'google/gemini-3.1-flash-lite',
     messages,
     temperature,
@@ -177,7 +197,17 @@ export async function chat(messages: unknown[], temperature = 0.1, maxTokens = 9
     max_tokens: maxTokens,
     usage: { include: true },
     ...(provider ? { provider } : {}),
-  });
+  };
+
+  if (enableWebSearch) {
+    body.tools = [
+      {
+        type: 'openrouter:web_search',
+      },
+    ];
+  }
+
+  return request('/chat/completions', body);
 }
 
 async function validateAudio(response: Response) {
