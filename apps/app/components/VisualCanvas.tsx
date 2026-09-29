@@ -13,68 +13,224 @@ interface VisualCanvasProps {
 
 const routes = [
   {
-    id: 'singapore',
-    label: 'Route A',
-    from: 'Tanjung Priok',
-    to: 'Port of Singapore',
-    region: 'Hub Asia/Global',
-    transitSea: '2-3 hari',
-    transitAir: '1.5 jam',
-    rate20: 420,
-    rate40: 690,
-    path: 'M78 190 C165 138 254 116 380 132',
-    color: '#d9ff63',
-    milestones: ['Gate-in Jakarta', 'Feeder Singapore', 'Customs hub'],
+    "id": "singapore",
+    "label": "Koridor A",
+    "from": "Tanjung Priok",
+    "to": "Port of Singapore",
+    "region": "Hub ASEAN / Global",
+    "transitSea": "2-3 hari",
+    "transitAir": "1.5 jam",
+    "rate20": 420,
+    "rate40": 690,
+    "path": "M78 190 C165 138 254 116 380 132",
+    "color": "#d9ff63",
+    "milestones": [
+      "Gate-in Priok",
+      "Feeder Singapore",
+      "Customs SFA hub"
+    ]
   },
   {
-    id: 'douala',
-    label: 'Route B',
-    from: 'Tanjung Priok',
-    to: 'Port of Douala',
-    region: 'Kamerun/Afrika',
-    transitSea: '28-35 hari',
-    transitAir: '19-25 jam',
-    rate20: 4100,
-    rate40: 6600,
-    path: 'M78 190 C176 84 278 86 432 202 C515 264 618 245 713 173',
-    color: '#f39a7c',
-    milestones: ['Singapore hub', 'Colombo relay', 'Gulf of Guinea'],
+    "id": "shanghai",
+    "label": "Koridor B",
+    "from": "Tanjung Priok",
+    "to": "Port of Shanghai (Yangshan)",
+    "region": "East Asia Mega Hub",
+    "transitSea": "8-12 hari",
+    "transitAir": "6-8 jam",
+    "rate20": 1100,
+    "rate40": 1950,
+    "path": "M78 190 C220 160 380 90 560 70",
+    "color": "#00e5ff",
+    "milestones": [
+      "Priok loading",
+      "South China Sea",
+      "GACC Clearance"
+    ]
   },
   {
-    id: 'rotterdam',
-    label: 'Route C',
-    from: 'Tanjung Perak',
-    to: 'Port of Rotterdam',
-    region: 'Eropa',
-    transitSea: '24-28 hari',
-    transitAir: '16-22 jam',
-    rate20: 3250,
-    rate40: 5300,
-    path: 'M111 236 C236 260 349 58 482 78 C588 94 660 118 748 92',
-    color: '#9fd7ff',
-    milestones: ['Surabaya loading', 'Suez lane', 'EU port entry'],
+    "id": "tokyo",
+    "label": "Koridor C",
+    "from": "Tanjung Priok",
+    "to": "Port of Yokohama / Tokyo",
+    "region": "Jepang / Pasifik",
+    "transitSea": "10-14 hari",
+    "transitAir": "7-9 jam",
+    "rate20": 1450,
+    "rate40": 2500,
+    "path": "M78 190 C260 140 440 60 640 55",
+    "color": "#ff80ab",
+    "milestones": [
+      "Direct liner",
+      "Okinawa transit",
+      "MHLW Quarantine"
+    ]
   },
   {
-    id: 'jebel-ali',
-    label: 'Route D',
-    from: 'Tanjung Priok',
-    to: 'Port of Jebel Ali',
-    region: 'Dubai/Timur Tengah',
-    transitSea: '14-18 hari',
-    transitAir: '8-11 jam',
-    rate20: 1850,
-    rate40: 2950,
-    path: 'M78 190 C196 202 292 177 407 128 C501 87 588 102 665 139',
-    color: '#ffe082',
-    milestones: ['Jakarta clearance', 'Indian Ocean', 'Jebel Ali free zone'],
+    "id": "los-angeles",
+    "label": "Koridor D",
+    "from": "Tanjung Priok",
+    "to": "Port of Los Angeles (POLA)",
+    "region": "Amerika Serikat / Pantai Barat",
+    "transitSea": "22-28 hari",
+    "transitAir": "19-24 jam",
+    "rate20": 3800,
+    "rate40": 5900,
+    "path": "M78 190 C300 240 550 180 760 120",
+    "color": "#b388ff",
+    "milestones": [
+      "Trans-Pacific Lane",
+      "ISF Filing 24h",
+      "US Customs FDA"
+    ]
   },
+  {
+    "id": "rotterdam",
+    "label": "Koridor E",
+    "from": "Tanjung Perak / Priok",
+    "to": "Port of Rotterdam",
+    "region": "Uni Eropa",
+    "transitSea": "24-28 hari",
+    "transitAir": "16-22 jam",
+    "rate20": 3250,
+    "rate40": 5300,
+    "path": "M111 236 C236 260 349 58 482 78 C588 94 660 118 748 92",
+    "color": "#9fd7ff",
+    "milestones": [
+      "Priok loading",
+      "Suez Canal transit",
+      "EU Port Entry"
+    ]
+  },
+  {
+    "id": "jebel-ali",
+    "label": "Koridor F",
+    "from": "Tanjung Priok",
+    "to": "Port of Jebel Ali (Dubai)",
+    "region": "Timur Tengah / GCC Hub",
+    "transitSea": "14-18 hari",
+    "transitAir": "8-11 jam",
+    "rate20": 1850,
+    "rate40": 2950,
+    "path": "M78 190 C196 202 292 177 407 128 C501 87 588 102 665 139",
+    "color": "#ffe082",
+    "milestones": [
+      "Indian Ocean route",
+      "Jebel Ali Free Zone",
+      "ESMA Halal Hub"
+    ]
+  },
+  {
+    "id": "sydney",
+    "label": "Koridor G",
+    "from": "Tanjung Priok",
+    "to": "Port Botany (Sydney)",
+    "region": "Australia / Oseania",
+    "transitSea": "12-16 hari",
+    "transitAir": "7-10 jam",
+    "rate20": 1950,
+    "rate40": 3100,
+    "path": "M78 190 C180 250 320 310 520 340",
+    "color": "#69f0ae",
+    "milestones": [
+      "Timor Sea route",
+      "Sydney Gateway",
+      "DAFF Biosecurity"
+    ]
+  },
+  {
+    "id": "douala",
+    "label": "Koridor H",
+    "from": "Tanjung Priok",
+    "to": "Port of Douala",
+    "region": "Afrika Barat",
+    "transitSea": "28-35 hari",
+    "transitAir": "19-25 jam",
+    "rate20": 4100,
+    "rate40": 6600,
+    "path": "M78 190 C176 84 278 86 432 202 C515 264 618 245 713 173",
+    "color": "#f39a7c",
+    "milestones": [
+      "Singapore hub",
+      "Colombo relay",
+      "Gulf of Guinea"
+    ]
+  }
 ];
 
 const tariffs = [
-  { hs: '0901.11', label: 'HS 0901.11 (Kopi Arabika/Robusta Biji Mentah)', duty: 5, vat: 11, fta: 'ATIGA 0%', savingsRate: 0.05 },
-  { hs: '1801.00', label: 'HS 1801.00 (Biji Kakao / Cocoa Beans)', duty: 5, vat: 11, fta: 'ATIGA 0%', savingsRate: 0.05 },
-  { hs: '1513.11', label: 'HS 1513.11 (Virgin Coconut Oil / Kelapa)', duty: 8, vat: 11, fta: 'ATIGA 0%', savingsRate: 0.08 },
-  { hs: '0804.50', label: 'HS 0804.50 (Buah Tropis Segar & Kering)', duty: 10, vat: 11, fta: 'ATIGA 0%', savingsRate: 0.1 },
+  {
+    "hs": "0901.11",
+    "label": "HS 0901.11 (Kopi Arabika/Robusta Biji Mentah)",
+    "duty": 5,
+    "vat": 11,
+    "fta": "ATIGA / EPA 0%",
+    "savingsRate": 0.05
+  },
+  {
+    "hs": "1702.90",
+    "label": "HS 1702.90 (Gula Aren Organik & Nektar Palma)",
+    "duty": 5,
+    "vat": 11,
+    "fta": "ATIGA 0% / GSP EU 2%",
+    "savingsRate": 0.05
+  },
+  {
+    "hs": "1801.00",
+    "label": "HS 1801.00 (Biji Kakao Fermentasi Pilihan)",
+    "duty": 5,
+    "vat": 11,
+    "fta": "ATIGA 0% / ACFTA 0%",
+    "savingsRate": 0.05
+  },
+  {
+    "hs": "1513.11",
+    "label": "HS 1513.11 (Virgin Coconut Oil / Minyak Kelapa Murni)",
+    "duty": 8,
+    "vat": 11,
+    "fta": "ATIGA 0% / US GSP 0%",
+    "savingsRate": 0.08
+  },
+  {
+    "hs": "0804.50",
+    "label": "HS 0804.50 (Buah Tropis Kering / Freeze Dried Mango)",
+    "duty": 10,
+    "vat": 11,
+    "fta": "ATIGA 0% / CEPA 2.5%",
+    "savingsRate": 0.1
+  },
+  {
+    "hs": "6214.10",
+    "label": "HS 6214.10 (Syal Sutra Batik Anggrek Vandoglas)",
+    "duty": 12,
+    "vat": 11,
+    "fta": "EPA Japan 0% / IA-CEPA 0%",
+    "savingsRate": 0.12
+  },
+  {
+    "hs": "4419.12",
+    "label": "HS 4419.12 (Peralatan Makan Bambu Ramah Lingkungan)",
+    "duty": 6,
+    "vat": 11,
+    "fta": "EU REX 0% / US Duty Free",
+    "savingsRate": 0.06
+  },
+  {
+    "hs": "8481.80",
+    "label": "HS 8481.80 (Fitting Katup Kuningan Presisi CNC)",
+    "duty": 5,
+    "vat": 11,
+    "fta": "ATIGA 0% / ACFTA 0%",
+    "savingsRate": 0.05
+  },
+  {
+    "hs": "3301.29",
+    "label": "HS 3301.29 (Minyak Atsiri Nilam Murni / Patchouli Oil)",
+    "duty": 5,
+    "vat": 11,
+    "fta": "WTO MFN 0% / EU Free",
+    "savingsRate": 0.05
+  }
 ];
 
 const checklist = [
