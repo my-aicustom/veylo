@@ -6,17 +6,41 @@ import { tradeAdvisorVoiceSystem } from '@/lib/ai/prompts';
 
 export const runtime = 'nodejs';
 
+export async function OPTIONS() {
+  return new NextResponse(null, {
+    status: 204,
+    headers: {
+      'Access-Control-Allow-Origin': '*',
+      'Access-Control-Allow-Methods': 'POST, OPTIONS',
+      'Access-Control-Allow-Headers': 'Content-Type, Authorization',
+      'Access-Control-Max-Age': '86400',
+    },
+  });
+}
+
 interface ChatRequest {
   message: string;
   history?: { speaker: 'user' | 'advisor'; text: string }[];
 }
 
+const corsHeaders = {
+  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Methods': 'POST, OPTIONS',
+  'Access-Control-Allow-Headers': 'Content-Type, Authorization',
+};
+
 export async function POST(req: NextRequest) {
   const blocked = guardApi(req, 'trade-chat', { limit: 40 });
-  if (blocked) return blocked;
+  if (blocked) {
+    blocked.headers.set('Access-Control-Allow-Origin', '*');
+    return blocked;
+  }
 
   const budgetBlocked = await guardAiBudget();
-  if (budgetBlocked) return budgetBlocked;
+  if (budgetBlocked) {
+    budgetBlocked.headers.set('Access-Control-Allow-Origin', '*');
+    return budgetBlocked;
+  }
 
   try {
     const body = (await req.json()) as ChatRequest;
@@ -84,15 +108,18 @@ Rules for recommendedView & recommendedRoute:
       };
     }
 
-    return NextResponse.json({
-      reply: parsed.reply || 'Informasi diterima. Silakan cek visual canvas untuk rincian ekspor.',
-      recommendedView: ['routes', 'tariff', 'compliance', 'market'].includes(parsed.recommendedView)
-        ? parsed.recommendedView
-        : 'routes',
-      recommendedRoute: ['singapore', 'douala', 'rotterdam', 'jebel-ali'].includes(parsed.recommendedRoute)
-        ? parsed.recommendedRoute
-        : undefined,
-    });
+    return NextResponse.json(
+      {
+        reply: parsed.reply || 'Informasi diterima. Silakan cek visual canvas untuk rincian ekspor.',
+        recommendedView: ['routes', 'tariff', 'compliance', 'market'].includes(parsed.recommendedView)
+          ? parsed.recommendedView
+          : 'routes',
+        recommendedRoute: ['singapore', 'douala', 'rotterdam', 'jebel-ali'].includes(parsed.recommendedRoute)
+          ? parsed.recommendedRoute
+          : undefined,
+      },
+      { headers: corsHeaders }
+    );
   } catch (error) {
     console.error('Trade chat error:', error);
     return NextResponse.json(
@@ -100,7 +127,7 @@ Rules for recommendedView & recommendedRoute:
         error: 'Gagal menghubungi Trade Advisor AI via OpenRouter.',
         reply: 'Maaf, terjadi kendala koneksi ke server AI OpenRouter. Silakan gunakan WhatsApp untuk respon instan.',
       },
-      { status: 502 }
+      { status: 502, headers: corsHeaders }
     );
   }
 }
