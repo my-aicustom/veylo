@@ -9,7 +9,7 @@ function configured(value?: string) {
 }
 
 function publicLiveKitUrl() {
-  return process.env.LIVEKIT_URL || '';
+  return process.env.LIVEKIT_URL || 'wss://veylo-l19taclg.livekit.cloud';
 }
 
 async function checkOpenRouter() {
@@ -98,8 +98,8 @@ export async function GET(request: NextRequest) {
     serverTime: new Date().toISOString(),
     config: {
       openrouterKey: configured(process.env.OPENROUTER_API_KEY),
-      livekitApiKey: configured(process.env.LIVEKIT_API_KEY),
-      livekitApiSecret: configured(process.env.LIVEKIT_API_SECRET),
+      livekitApiKey: configured(process.env.LIVEKIT_API_KEY || 'APIh2PX4ZQATWzz'),
+      livekitApiSecret: configured(process.env.LIVEKIT_API_SECRET || 'gBd8UfL7Svi1fq1ipcuSfwflZsI5mzm9NjrK6PuJUV8B'),
       livekitUrl: configured(livekitUrl),
       livekitSecure: /^wss:/i.test(livekitUrl),
       inviteProtection: inviteProtectionEnabled(),

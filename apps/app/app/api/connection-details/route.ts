@@ -4,14 +4,40 @@ import type { ConnectionDetails } from '@/lib/types';
 import { cleanText, guardApi } from '@/lib/api-guard';
 import { inviteProtectionEnabled, verifyInviteToken } from '@/lib/invite-token';
 
-const LIVEKIT_URL = process.env.LIVEKIT_URL;
-const API_KEY = process.env.LIVEKIT_API_KEY;
-const API_SECRET = process.env.LIVEKIT_API_SECRET;
+export const dynamic = 'force-dynamic';
+export const runtime = 'nodejs';
+
+const FALLBACK_LIVEKIT_URL = 'wss://veylo-l19taclg.livekit.cloud';
+const FALLBACK_API_KEY = 'APIh2PX4ZQATWzz';
+const FALLBACK_API_SECRET = 'gBd8UfL7Svi1fq1ipcuSfwflZsI5mzm9NjrK6PuJUV8B';
 const ROOM_PATTERN = /^[A-Za-z0-9_-]{3,80}$/;
 
+const corsHeaders = {
+  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Methods': 'POST, OPTIONS',
+  'Access-Control-Allow-Headers': 'Content-Type, Authorization',
+};
+
+export async function OPTIONS() {
+  return new NextResponse(null, {
+    status: 204,
+    headers: {
+      ...corsHeaders,
+      'Access-Control-Max-Age': '86400',
+    },
+  });
+}
+
 export async function POST(request: NextRequest) {
+  const LIVEKIT_URL = process.env.LIVEKIT_URL || FALLBACK_LIVEKIT_URL;
+  const API_KEY = process.env.LIVEKIT_API_KEY || FALLBACK_API_KEY;
+  const API_SECRET = process.env.LIVEKIT_API_SECRET || FALLBACK_API_SECRET;
+
   const blocked = guardApi(request, 'join', { limit: 40, windowMs: 5 * 60_000 });
-  if (blocked) return blocked;
+  if (blocked) {
+    blocked.headers.set('Access-Control-Allow-Origin', '*');
+    return blocked;
+  }
 
   try {
     if (!LIVEKIT_URL || !API_KEY || !API_SECRET) {
@@ -22,7 +48,7 @@ export async function POST(request: NextRequest) {
           code: 'LIVEKIT_NOT_CONFIGURED',
           message: 'Fitur 1-on-1 Video Call memerlukan server LiveKit (LIVEKIT_URL, LIVEKIT_API_KEY, LIVEKIT_API_SECRET). Di Vercel, tambahkan variabel ini atau gunakan LiveKit Cloud gratis.',
         },
-        { status: 503 }
+        { status: 503, headers: corsHeaders }
       );
     }
 
@@ -86,8 +112,13 @@ export async function POST(request: NextRequest) {
       participantName,
       participantToken: await token.toJwt(),
     };
-    return NextResponse.json(data, { headers: { 'Cache-Control': 'no-store' } });
+    return NextResponse.json(data, {
+      headers: {
+        'Cache-Control': 'no-store',
+        ...corsHeaders,
+      },
+    });
   } catch (error) {
-    return NextResponse.json({ error: 'Token creation failed' }, { status: 500 });
+    return NextResponse.json({ error: 'Token creation failed' }, { status: 500, headers: corsHeaders });
   }
 }

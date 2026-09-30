@@ -241,11 +241,11 @@ export default function DiagnosticsPage() {
 
         <article className="diag-card">
           <div className="eyebrow">SERVER CONFIG</div>
-          <Diag label="OpenRouter key" value={Boolean(config.openrouterKey)} />
-          <Diag label="LiveKit API key" value={Boolean(config.livekitApiKey)} />
-          <Diag label="LiveKit secret" value={Boolean(config.livekitApiSecret)} />
-          <Diag label="LiveKit URL" value={Boolean(config.livekitUrl)} />
-          <Diag label="Secure WSS" value={Boolean(config.livekitSecure)} />
+          <Diag label="OpenRouter key" value={Boolean(config.openrouterKey)} pending={!health} />
+          <Diag label="LiveKit API key" value={Boolean(config.livekitApiKey)} pending={!health} />
+          <Diag label="LiveKit secret" value={Boolean(config.livekitApiSecret)} pending={!health} />
+          <Diag label="LiveKit URL" value={Boolean(config.livekitUrl)} pending={!health} />
+          <Diag label="Secure WSS" value={Boolean(config.livekitSecure)} pending={!health} />
           <p className="diag-note">Local insecure WebSocket URLs are valid for development. Production should expose browser-reachable secure WebSocket URLs.</p>
         </article>
 

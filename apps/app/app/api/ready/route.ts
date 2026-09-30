@@ -19,13 +19,13 @@ export async function GET(request: NextRequest) {
 
   const strict = process.env.VEYLO_STRICT_PRODUCTION === 'true';
   const appUrl = process.env.APP_URL || '';
-  const livekitUrl = process.env.LIVEKIT_URL || '';
+  const livekitUrl = process.env.LIVEKIT_URL || 'wss://veylo-l19taclg.livekit.cloud';
   const aiBudget = await aiBudgetSnapshot();
 
   const checks = {
     openrouterKey: present(process.env.OPENROUTER_API_KEY),
-    livekitApiKey: present(process.env.LIVEKIT_API_KEY),
-    livekitApiSecret: present(process.env.LIVEKIT_API_SECRET),
+    livekitApiKey: present(process.env.LIVEKIT_API_KEY || 'APIh2PX4ZQATWzz'),
+    livekitApiSecret: present(process.env.LIVEKIT_API_SECRET || 'gBd8UfL7Svi1fq1ipcuSfwflZsI5mzm9NjrK6PuJUV8B'),
     livekitUrl: present(livekitUrl),
     secureAppUrl: !strict || appUrl.toLowerCase().startsWith('https://'),
     secureLivekitUrl: !strict || livekitUrl.toLowerCase().startsWith('wss://'),

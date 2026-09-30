@@ -62,7 +62,7 @@ export function RoomPageClient({ roomName }: { roomName: string }) {
     const payload = await response.json();
     if (!response.ok) {
       setChoices(null);
-      if (payload?.code === 'LIVEKIT_NOT_CONFIGURED') {
+      if (payload?.code === 'LIVEKIT_NOT_CONFIGURED' || payload?.error?.toLowerCase().includes('livekit')) {
         setError('LIVEKIT_NOT_CONFIGURED');
       } else {
         setError(payload?.error || 'Could not join room');
