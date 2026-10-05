@@ -122,8 +122,8 @@ const routes = [
     "region": "Timur Tengah / GCC Hub",
     "transitSea": "14-18 hari",
     "transitAir": "8-11 jam",
-    "rate20": 1850,
-    "rate40": 2950,
+    "rate20": 5500,
+    "rate40": 6850,
     "path": "M78 190 C196 202 292 177 407 128 C501 87 588 102 665 139",
     "color": "#ffe082",
     "milestones": [
@@ -133,8 +133,88 @@ const routes = [
     ]
   },
   {
-    "id": "sydney",
+    "id": "nhava-sheva",
     "label": "Koridor G",
+    "from": "Tanjung Priok",
+    "fromLocode": "IDJKT",
+    "to": "Port of Nhava Sheva (JNPT Mumbai)",
+    "toLocode": "INNSA",
+    "region": "India / Asia Selatan Hub",
+    "transitSea": "12-16 hari",
+    "transitAir": "6-8 jam",
+    "rate20": 2350,
+    "rate40": 2950,
+    "path": "M78 190 C180 160 300 130 450 110",
+    "color": "#ffb74d",
+    "milestones": [
+      "Direct / Hub route",
+      "JNPT Terminal",
+      "FSSAI & ICEGATE entry"
+    ]
+  },
+  {
+    "id": "apapa-lagos",
+    "label": "Koridor H",
+    "from": "Tanjung Priok",
+    "fromLocode": "IDJKT",
+    "to": "Port of Apapa / Lekki (Lagos)",
+    "toLocode": "NGAPP",
+    "region": "Nigeria / Afrika Barat",
+    "transitSea": "28-35 hari",
+    "transitAir": "18-24 jam",
+    "rate20": 4500,
+    "rate40": 5650,
+    "path": "M78 190 C200 120 320 180 520 220 C620 250 710 200 780 180",
+    "color": "#ff7043",
+    "milestones": [
+      "Cape corridor",
+      "Lekki Deep Sea hub",
+      "SONCAP & NAFDAC"
+    ]
+  },
+  {
+    "id": "durban",
+    "label": "Koridor I",
+    "from": "Tanjung Priok",
+    "fromLocode": "IDJKT",
+    "to": "Port of Durban",
+    "toLocode": "ZADUR",
+    "region": "Afrika Selatan Hub",
+    "transitSea": "22-26 hari",
+    "transitAir": "15-20 jam",
+    "rate20": 3950,
+    "rate40": 5400,
+    "path": "M78 190 C180 230 350 280 550 310",
+    "color": "#ab47bc",
+    "milestones": [
+      "Indian Ocean Lane",
+      "Durban Gateway",
+      "SARS EDI Clearance"
+    ]
+  },
+  {
+    "id": "mombasa",
+    "label": "Koridor J",
+    "from": "Tanjung Priok",
+    "fromLocode": "IDJKT",
+    "to": "Port of Mombasa",
+    "toLocode": "KEMBA",
+    "region": "Kenya / Afrika Timur",
+    "transitSea": "20-25 hari",
+    "transitAir": "14-18 jam",
+    "rate20": 3750,
+    "rate40": 5750,
+    "path": "M78 190 C220 170 380 200 580 230",
+    "color": "#26a69a",
+    "milestones": [
+      "East Africa corridor",
+      "Mombasa port",
+      "KEBS PVoC entry"
+    ]
+  },
+  {
+    "id": "sydney",
+    "label": "Koridor K",
     "from": "Tanjung Priok",
     "fromLocode": "IDJKT",
     "to": "Port Botany (Sydney)",
@@ -154,7 +234,7 @@ const routes = [
   },
   {
     "id": "douala",
-    "label": "Koridor H",
+    "label": "Koridor L",
     "from": "Tanjung Priok",
     "fromLocode": "IDJKT",
     "to": "Port of Douala",
@@ -250,11 +330,14 @@ const tariffs = [
 ];
 
 const checklist = [
-  'Sertifikasi Halal BPJPH',
-  'Sertifikat Fitosanitari (Barantan RI)',
-  'HACCP & ISO 22000',
-  'Standard SFA (Singapura) / ANOR (Kamerun)',
-  'Dokumen Ekspor (PEB, SKA Form D/AK, Bill of Lading, Packing List)',
+  'Sertifikasi Halal BPJPH & Akun SKA / Phyto Mandiri',
+  'Izin Karantina Shipper (Syarat Mutlak Fasilitasi Karantina/Fumigasi Forwarder)',
+  'Sertifikat Fitosanitari (Barantan RI) & Fumigasi ($200-$300 FCL / $175 LCL)',
+  'HACCP & ISO 22000 untuk Olahan Pangan',
+  'Kargo Khusus Reefer: Surcharge +$500 (20ft) / +$800 (40ft) & Sewa Genset $250/cont',
+  'Batas Rasio Berat LCL: Maksimal 800 kg per 1 CBM',
+  'Standard SFA (Singapura) / FSSAI (India) / NAFDAC (Nigeria) / ANOR (Kamerun)',
+  'Dokumen Ekspor (PEB, SKA Form D/E/AIFTA, Bill of Lading, Packing List)',
 ];
 
 const marketRows = [
@@ -265,11 +348,12 @@ const marketRows = [
 ];
 
 const quickChips: Array<{ label: string; view: VisualCanvasView; route?: string }> = [
-  { label: 'Rute Tanjung Priok -> Singapura', view: 'routes', route: 'singapore' },
-  { label: 'Rute Tanjung Priok -> Douala Kamerun', view: 'routes', route: 'douala' },
+  { label: 'Rute Priok -> Nhava Sheva India ($2,350)', view: 'routes', route: 'nhava-sheva' },
+  { label: 'Rute Priok -> Apapa Lagos Nigeria ($4,500)', view: 'routes', route: 'apapa-lagos' },
+  { label: 'Rute Priok -> Jebel Ali Dubai ($5,500)', view: 'routes', route: 'jebel-ali' },
+  { label: 'Rute Priok -> Singapura ($300)', view: 'routes', route: 'singapore' },
+  { label: 'Syarat Izin Karantina & Reefer', view: 'compliance' },
   { label: 'Cek HS Code Kopi 0901', view: 'tariff' },
-  { label: 'Syarat Ekspor Kakao ke Afrika', view: 'compliance' },
-  { label: 'Audit Kesiapan Sertifikasi', view: 'compliance' },
 ];
 
 export function VisualCanvas({ activeView, activeRoute, onViewChange }: VisualCanvasProps) {
